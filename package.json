@@ -2,8 +2,8 @@
     "name": "call-graph",
     "displayName": "Call Graph",
     "description": "call graph for vscode",
-    "version": "1.2.3",
-    "publisher": "LuoZhihao",
+    "version": "1.2.4",
+    "publisher": "WuZhiguo",
     "engines": {
         "vscode": "^1.65.0"
     },
@@ -51,6 +51,11 @@
                     "type": "number",
                     "default": 0,
                     "description": "the graph max depth. Set to 0 for unlimited depth"
+                },
+                "call-graph.inDegreeThreshold": {
+                    "type": "number",
+                    "default": 5,
+                    "description": "filter nodes with in-degree greater than this threshold. Set to 5 to disable filtering"
                 }
             }
         }

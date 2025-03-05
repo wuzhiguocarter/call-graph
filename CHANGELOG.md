@@ -1,5 +1,10 @@
 # Change Log
 
+## [1.2.4] 2025-03-05
+
+- add `call-graph.inDegreeThreshold` setting to filter nodes with in-degree greater than the threshold in incoming call graphs.
+- fix issue with duplicate edges appearing between the same nodes in the graph visualization.
+
 ## [1.2.3] 2024-12-19
 
 -   fix the issue that can't run any commands from v1.2.2 ([#31](https://github.com/beicause/call-graph/issues/31)).

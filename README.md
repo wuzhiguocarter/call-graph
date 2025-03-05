@@ -1,6 +1,7 @@
 # call-graph
 
-![call-graph](./images/call_graph_outgoing.png)
+![](images/call_graph_outgoing.jpg)
+
 vscode extension for generate call graph in [graphviz dot language](https://www.graphviz.org/doc/info/lang.html), based on vscode call hierarchy language feature.
 
 ## Features
@@ -18,7 +19,11 @@ vscode extension for generate call graph in [graphviz dot language](https://www.
 
 ## Configuration
 
-You can configure `ignoreFile`(.callgraphignore by default), `maxDepth`. See the descriptions in setting.
+You can configure `ignoreFile`(.callgraphignore by default), `maxDepth`, and `inDegreeThreshold`. See the descriptions in setting.
+
+- `ignoreFile`: Path to the file that specifies paths to ignore (default: ${workspace}/.callgraphignore)
+- `maxDepth`: The maximum depth of the call graph (default: 0, which means unlimited)
+- `inDegreeThreshold`: Filter nodes with in-degree greater than this threshold in incoming call graphs (default: 5)
 
 ## How it works
 

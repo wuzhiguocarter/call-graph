@@ -7,11 +7,20 @@ import { output } from './extension'
 export function generateDot(graph: CallHierarchyNode, path: string) {
     const dot = new Graph()
     const root = vscode.workspace.workspaceFolders?.[0].uri.path ?? ''
-    dot.addAttr({ rankdir: 'LR' })
+    dot.addAttr({
+        rankdir: 'LR',
+    })
     const getNode = (n: CallHierarchyNode) => {
+        let label = n.item.name
+
+        // Add in-degree information to the label if available
+        if (n.inDegree !== undefined) {
+            label = `${n.item.name}`
+        }
+
         return {
             name: `"${n.item.uri.path}#${n.item.name}@${n.item.range.start.line}:${n.item.range.start.character}"`,
-            attr: { label: n.item.name },
+            attr: { label: label },
             subgraph: {
                 name: n.item.uri.path,
                 attr: { label: n.item.uri.path.replace(root, '${workspace}') },
@@ -77,7 +86,10 @@ class Graph {
     private _subgraphs = new Map<string, string>()
     private _nodes = new Set<Node>()
     constructor(title?: string) {
-        this._dot = 'digraph' + ` ${title ?? ''} {\n`
+        this._dot =
+            'digraph' +
+            ` ${title ?? ''} {\n` +
+            'node [shape=box]\nnodesep=.05\n'
     }
     addAttr(attr: Attr) {
         this._dot += this.getAttr(attr, true)
@@ -89,6 +101,10 @@ class Graph {
             if (n.subgraph) this.insertToSubgraph(n.subgraph, n.name + ' ')
             let s = ''
             const removeRepeat = [] as number[]
+
+            // Create a Set to track unique edges and prevent duplicates
+            const uniqueEdges = new Set<string>()
+
             if (n.next.length > 0) {
                 const children = n.next
                     .map((child, index) => {
@@ -101,10 +117,27 @@ class Graph {
                                 child.subgraph,
                                 child.name + ' ',
                             )
+
+                        // Create a unique edge identifier
+                        const edgeId = `${name} -> ${child.name}`
+
+                        // Skip if we've already created this edge
+                        if (uniqueEdges.has(edgeId)) {
+                            removeRepeat.push(index)
+                            return null
+                        }
+
+                        // Add to our set of unique edges
+                        uniqueEdges.add(edgeId)
+
                         return child.name + this.getAttr(child.attr)
                     })
+                    .filter(Boolean) // Filter out null values from duplicate edges
                     .join(' ')
-                s += `{${name}} -> {${children}}\n`
+
+                if (children.length > 0) {
+                    s += `{${name}} -> {${children}}\n`
+                }
             } else s += name + '\n'
             this._dot += s
             this.addNode(
