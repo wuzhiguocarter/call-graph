@@ -1,7 +1,7 @@
 {
-    "name": "vscode-call-graph",
-    "displayName": "Call Graph",
-    "description": "call graph for vscode",
+    "name": "callviz",
+    "displayName": "callviz",
+    "description": "Callgraph Visualization for vscode",
     "version": "1.2.5",
     "publisher": "WuZhiguo",
     "engines": {
