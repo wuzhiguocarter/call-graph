@@ -1,5 +1,5 @@
 {
-    "name": "call-graph",
+    "name": "vscode-call-graph",
     "displayName": "Call Graph",
     "description": "call graph for vscode",
     "version": "1.2.5",
