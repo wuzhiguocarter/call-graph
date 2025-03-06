@@ -1,5 +1,9 @@
 # Change Log
 
+## [1.2.5] 2025-03-06
+
+- Same features as v1.2.4 with version bump for deployment
+
 ## [1.2.4] 2025-03-05
 
 - add `call-graph.inDegreeThreshold` setting to filter nodes with in-degree greater than the threshold in incoming call graphs.
