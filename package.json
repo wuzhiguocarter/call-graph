@@ -2,7 +2,7 @@
     "name": "callviz",
     "displayName": "callviz",
     "description": "Callgraph Visualization for vscode",
-    "version": "1.2.5",
+    "version": "1.2.6",
     "publisher": "WuZhiguo",
     "engines": {
         "vscode": "^1.65.0"
@@ -99,14 +99,14 @@
     },
     "repository": {
         "type": "git",
-        "url": "https://github.com/beicause/call-graph.git"
+        "url": "https://github.com/wuzhiguocarter/call-graph.git"
     },
     "license": "Apache",
     "icon": "images/icon.webp",
     "bugs": {
-        "url": "https://github.com/beicause/call-graph/issues"
+        "url": "https://github.com/wuzhiguocarter/call-graph/issues"
     },
-    "homepage": "https://github.com/beicause/call-graph/blob/master/README.md",
+    "homepage": "https://github.com/wuzhiguocarter/call-graph/blob/master/README.md",
     "keywords": [
         "graphviz",
         "call graph",

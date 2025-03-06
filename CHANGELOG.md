@@ -1,5 +1,10 @@
 # Change Log
 
+## [1.2.6] 2025-03-06
+
+- Updated repository URLs
+- Renamed extension to "callviz" for marketplace uniqueness
+
 ## [1.2.5] 2025-03-06
 
 - Same features as v1.2.4 with version bump for deployment
