@@ -118,6 +118,8 @@ interface WebviewMsg {
     command: string
     type: 'dot' | 'svg'
     data: string
+    filename?: string
+    contentType?: string
 }
 
 const registerWebviewPanelSerializer = (
@@ -197,6 +199,49 @@ export function activate(context: vscode.ExtensionContext) {
                     )
                 }
                 onDowload(msg.type)
+            } else if (msg.command === 'exportFile') {
+                // Handle the exportFile command from sequence.html
+                const handleExport = async () => {
+                    try {
+                        // Determine file extension based on contentType or use the one in filename
+                        const filename = msg.filename || `${savedName}.txt`
+
+                        // Set up filters based on content type
+                        const filters: { [key: string]: string[] } = {}
+                        if (msg.contentType === 'image/svg+xml') {
+                            filters.Image = ['svg']
+                        } else if (msg.contentType === 'text/plain') {
+                            filters.Text = ['mmd', 'txt']
+                        } else {
+                            filters.All = ['*']
+                        }
+
+                        const f = await vscode.window.showSaveDialog({
+                            filters,
+                            defaultUri: vscode.Uri.joinPath(
+                                workspace,
+                                filename,
+                            ),
+                        })
+
+                        if (!f) return
+
+                        fs.writeFileSync(f.fsPath, msg.data)
+                        vscode.window.showInformationMessage(
+                            'File saved: ' + f.fsPath,
+                        )
+                    } catch (error) {
+                        console.error('Error exporting file:', error)
+                        vscode.window.showErrorMessage(
+                            'Failed to export file: ' +
+                                (error instanceof Error
+                                    ? error.message
+                                    : String(error)),
+                        )
+                    }
+                }
+
+                handleExport()
             }
         }
     const incomingDisposable = vscode.commands.registerCommand(

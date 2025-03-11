@@ -106,6 +106,18 @@ function traverseForCallGraph(
 
     // 处理子节点时动态添加被调用方
     node.children.forEach(child => {
+        // Apply in-degree filtering - skip nodes with high in-degree
+        if (
+            inDegreeThreshold > 0 &&
+            child.inDegree &&
+            child.inDegree > inDegreeThreshold
+        ) {
+            output.appendLine(
+                `Skipping node due to high in-degree (${child.inDegree} > ${inDegreeThreshold}): ${child.item.name}`,
+            )
+            return
+        }
+
         const childFullPath = child.item.uri.fsPath
         const calleePath = workspaceRoot
             ? path.relative(workspaceRoot, childFullPath).replace(/\\/g, '/')
@@ -231,9 +243,12 @@ class MermaidSequenceDiagram {
         // Get a safe ID for this participant
         const safeId = this.getSafeId(shortName)
 
+        // Escape any special characters in the shortName
+        const safeShortName = shortName.replace(/["\\]/g, '\\$&').slice(0, -4)
+
         // Use just the shortName as the display name - it's already more readable
         // in the getUniqueShortName function
-        this._participants.push(`    participant ${safeId} as "${shortName}"`)
+        this._participants.push(`    participant ${safeId} as ${safeShortName}`)
     }
 
     /**

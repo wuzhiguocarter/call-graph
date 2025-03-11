@@ -257,38 +257,72 @@
                     return
                 }
 
-                const serializer = new XMLSerializer()
-                const source = serializer.serializeToString(svg)
-                const blob = new Blob([source], { type: 'image/svg+xml' })
-                const url = URL.createObjectURL(blob)
+                try {
+                    // Clone the SVG to avoid modifying the displayed one
+                    const clonedSvg = svg.cloneNode(true)
 
-                const a = document.createElement('a')
-                a.href = url
-                a.download = `diagram-${Date.now()}.svg`
-                document.body.appendChild(a)
-                a.click()
-                document.body.removeChild(a)
-                URL.revokeObjectURL(url)
+                    // Make sure the SVG has proper dimensions
+                    if (
+                        !clonedSvg.getAttribute('width') ||
+                        !clonedSvg.getAttribute('height')
+                    ) {
+                        const bbox = svg.getBBox()
+                        clonedSvg.setAttribute('width', bbox.width)
+                        clonedSvg.setAttribute('height', bbox.height)
+                    }
+
+                    const serializer = new XMLSerializer()
+                    const source = serializer.serializeToString(clonedSvg)
+
+                    // Use VSCode messaging to trigger the download
+                    vscode.postMessage({
+                        command: 'exportFile',
+                        data: source,
+                        filename: `diagram-${Date.now()}.svg`,
+                        contentType: 'image/svg+xml',
+                    })
+                } catch (error) {
+                    showError(error)
+                    console.error('Export SVG error:', error)
+                }
             }
 
             function downloadMMD() {
-                const fileName =
-                    vscode.getState().split('/').pop() || 'diagram.mmd'
-                fetch(vscode.getState())
-                    .then(response => response.text())
-                    .then(text => {
-                        const blob = new Blob([text], { type: 'text/plain' })
-                        const url = URL.createObjectURL(blob)
+                try {
+                    const fileUri = vscode.getState()
+                    if (!fileUri) {
+                        showError(new Error('无法获取文件URI'))
+                        return
+                    }
 
-                        const a = document.createElement('a')
-                        a.href = url
-                        a.download = fileName
-                        document.body.appendChild(a)
-                        a.click()
-                        document.body.removeChild(a)
-                        URL.revokeObjectURL(url)
-                    })
-                    .catch(error => showError(error))
+                    const fileName = fileUri.split('/').pop() || 'diagram.mmd'
+
+                    fetch(fileUri)
+                        .then(response => {
+                            if (!response.ok) {
+                                throw new Error(
+                                    `HTTP error! Status: ${response.status}`,
+                                )
+                            }
+                            return response.text()
+                        })
+                        .then(text => {
+                            // Use VSCode messaging to trigger the download
+                            vscode.postMessage({
+                                command: 'exportFile',
+                                data: text,
+                                filename: fileName,
+                                contentType: 'text/plain',
+                            })
+                        })
+                        .catch(error => {
+                            showError(error)
+                            console.error('Download MMD error:', error)
+                        })
+                } catch (error) {
+                    showError(error)
+                    console.error('Download MMD error:', error)
+                }
             }
 
             function showError(error) {
