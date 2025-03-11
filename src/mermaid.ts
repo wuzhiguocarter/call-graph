@@ -234,7 +234,7 @@ class MermaidSequenceDiagram {
         const safeId = this.getSafeId(shortName)
 
         // Escape any special characters in the shortName
-        const safeShortName = shortName.replace(/["\\]/g, '\\$&').slice(0, -4)
+        const safeShortName = shortName.replace(/["\\]/g, '\\$&').slice(0, -5)
 
         // Use just the shortName as the display name - it's already more readable
         // in the getUniqueShortName function
