@@ -6,16 +6,22 @@ vscode extension for generate call graph in [graphviz dot language](https://www.
 
 ## Features
 
--   generate call graph in graphviz dot language and preview.
--   save graph as dot or svg file
+-   Generate call graph in graphviz dot language and preview
+-   Generate sequence diagrams using Mermaid syntax
+-   Save graph as dot or svg file
+-   Export sequence diagrams as SVG or download source code
+-   Intelligent filtering of high in-degree nodes to reduce diagram complexity
+-   Accurate representation of actual call sequence in sequence diagrams
 
 ## Quick start
 
 1. Open your folder and select a entry function
 2. Run `CallGraph.showOutgoingCallGraph` command using context menu or `Ctrl+Shift+P` to show outgoing calls
 3. Or Run `CallGraph.showIncomingCallGraph` command using context menu or `Ctrl+Shift+P` to show incoming calls
-4. Click `save dot file` or `save as svg` in the bottom left corner to save the graph
-5. Add `.callgraphignore` file in your project root directory to ignore some files or folders in workspace (the syntax is the same as `.gitignore`)
+4. For sequence diagrams, use `CallGraph.showOutgoingSequenceDiagram` or `CallGraph.showIncomingSequenceDiagram`
+5. Click `save dot file` or `save as svg` in the bottom left corner to save the graph
+6. For sequence diagrams, use the "Export SVG" or "Download Source Code" buttons
+7. Add `.callgraphignore` file in your project root directory to ignore some files or folders in workspace (the syntax is the same as `.gitignore`)
 
 ## Configuration
 
@@ -24,6 +30,21 @@ You can configure `ignoreFile`(.callgraphignore by default), `maxDepth`, and `in
 - `ignoreFile`: Path to the file that specifies paths to ignore (default: ${workspace}/.callgraphignore)
 - `maxDepth`: The maximum depth of the call graph (default: 0, which means unlimited)
 - `inDegreeThreshold`: Filter nodes with in-degree greater than this threshold in incoming call graphs (default: 5)
+
+## Recent Updates
+
+### Sequence Diagrams
+- Added support for generating sequence diagrams using Mermaid syntax
+- Sequence diagrams now accurately reflect the actual call order in your code
+- Export sequence diagrams as SVG or download the Mermaid source code
+
+### Node Filtering
+- Improved filtering of high in-degree nodes to reduce diagram complexity
+- Configurable threshold via the `inDegreeThreshold` setting
+
+### UI Improvements
+- Enhanced zoom and pan controls for better diagram navigation
+- Added export functionality for both call graphs and sequence diagrams
 
 ## How it works
 

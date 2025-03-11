@@ -27,6 +27,9 @@ export function generateMermaid(graph: CallHierarchyNode, path: string) {
     // Sets to track visited nodes and detect cycles
     const visited = new Set<string>()
 
+    // Store calls in order of discovery to preserve sequence
+    const orderedCalls: Array<[string, string, string]> = []
+
     // Get the in-degree threshold from settings
     const inDegreeThreshold =
         vscode.workspace
@@ -44,6 +47,7 @@ export function generateMermaid(graph: CallHierarchyNode, path: string) {
         participants,
         workspaceRoot,
         visited,
+        orderedCalls,
         inDegreeThreshold,
     )
 
@@ -52,11 +56,9 @@ export function generateMermaid(graph: CallHierarchyNode, path: string) {
         mermaid.addParticipant(filePath, displayName)
     })
 
-    // 执行拓扑排序
-    const sortedCalls = topologicalSort(callGraph)
-
+    // Use the ordered calls instead of topological sort
     // 生成Mermaid调用序列
-    sortedCalls.forEach(([callerPath, calleePath, callLabel]) => {
+    orderedCalls.forEach(([callerPath, calleePath, callLabel]) => {
         const signature = `${callerPath}->${calleePath}:${callLabel}`
         if (!callSignatures.has(signature)) {
             mermaid.addSimpleCall(
@@ -87,6 +89,7 @@ function traverseForCallGraph(
     participants: Map<string, string>,
     workspaceRoot: string,
     visited: Set<string> = new Set(),
+    orderedCalls: Array<[string, string, string]> = [],
     inDegreeThreshold: number = 5,
 ) {
     // 获取文件相对路径作为参与者标识
@@ -141,6 +144,9 @@ function traverseForCallGraph(
         }
         callGraph.get(callerPath)!.add(edge)
 
+        // Add to ordered calls to preserve sequence
+        orderedCalls.push([callerPath, calleePath, callLabel])
+
         // 递归处理子节点
         if (!visited.has(child.item.uri.fsPath)) {
             visited.add(child.item.uri.fsPath)
@@ -150,58 +156,11 @@ function traverseForCallGraph(
                 participants,
                 workspaceRoot,
                 visited,
+                orderedCalls,
                 inDegreeThreshold,
             )
         }
     })
-}
-
-/**
- * 拓扑排序实现
- */
-function topologicalSort(
-    graph: Map<string, Set<string>>,
-): Array<[string, string, string]> {
-    const inDegree = new Map<string, number>()
-    const queue: string[] = []
-    const result: Array<[string, string, string]> = []
-
-    // 初始化入度表
-    graph.forEach((edges, caller) => {
-        inDegree.set(caller, 0)
-        edges.forEach(edge => {
-            const [, callee] = edge.split('->')
-            inDegree.set(callee, (inDegree.get(callee) || 0) + 1)
-        })
-    })
-
-    // 找到初始节点（入度为0）
-    inDegree.forEach((degree, node) => {
-        if (degree === 0) {
-            queue.push(node)
-        }
-    })
-
-    // Kahn算法实现拓扑排序
-    while (queue.length > 0) {
-        const caller = queue.shift()!
-
-        graph.get(caller)?.forEach(edge => {
-            const [callerPath, rest] = edge.split('->')
-            const [calleePath, callLabel] = rest.split(':')
-
-            result.push([callerPath, calleePath, callLabel])
-
-            const currentDegree = inDegree.get(calleePath)! - 1
-            inDegree.set(calleePath, currentDegree)
-
-            if (currentDegree === 0) {
-                queue.push(calleePath)
-            }
-        })
-    }
-
-    return result
 }
 
 /**
