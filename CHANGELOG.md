@@ -1,5 +1,21 @@
 # Change Log
 
+## [1.2.9] 2025-03-11
+
+- Improved sequence diagram accuracy with source position-based ordering
+  - Enhanced call hierarchy nodes to track source code positions
+  - Implemented sorting of function calls based on their position in source code
+  - Fixed issue where sequence diagrams didn't reflect actual call order
+- Updated README with recent feature changes and improvements
+
+## [1.2.8] 2025-03-08
+
+- Fixed participant name formatting in Mermaid sequence diagrams
+  - Removed extra quotation marks in participant names
+- Improved file export functionality for sequence diagrams
+  - Added proper handling for SVG export and source code download
+  - Updated to use VSCode's save dialog for file operations
+
 ## [1.2.6] 2025-03-06
 
 - Added Mermaid sequence diagram generation feature

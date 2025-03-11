@@ -6,6 +6,7 @@ export interface CallHierarchyNode {
     item: CallHierarchyItem
     children: CallHierarchyNode[]
     inDegree?: number
+    sourcePosition?: vscode.Position
 }
 
 async function getCallNode(
@@ -26,8 +27,8 @@ async function getCallNode(
         : 'vscode.provideIncomingCalls'
     const nodes = new Set<CallHierarchyNode>()
     const inDegreeMap = new Map<string, number>()
+    const sourcePositionMap = new Map<string, vscode.Position>()
 
-    // First pass to calculate in-degrees
     const calculateInDegrees = async (node: CallHierarchyNode, depth = 0) => {
         if (maxDepth > 0 && depth >= maxDepth) return
 
@@ -46,10 +47,8 @@ async function getCallNode(
                     return null
                 }
 
-                // Create a unique key for the node
                 const nodeKey = `${next.name}|${next.uri.toString()}|${next.range.start.line}:${next.range.start.character}`
 
-                // Increment in-degree count
                 if (outgoing) {
                     const currentCount = inDegreeMap.get(nodeKey) || 0
                     inDegreeMap.set(nodeKey, currentCount + 1)
@@ -58,7 +57,15 @@ async function getCallNode(
                     )
                 }
 
-                // Check if we've already processed this node
+                if (call instanceof vscode.CallHierarchyOutgoingCall) {
+                    if (call.fromRanges && call.fromRanges.length > 0) {
+                        sourcePositionMap.set(nodeKey, call.fromRanges[0].start)
+                        output.appendLine(
+                            `Stored source position for ${next.name}: Line ${call.fromRanges[0].start.line}, Character ${call.fromRanges[0].start.character}`,
+                        )
+                    }
+                }
+
                 let isSkip = false
                 for (const n of nodes) {
                     if (isCallHierarchyItemEqual(n.item, next)) {
@@ -76,7 +83,6 @@ async function getCallNode(
         )
     }
 
-    // Second pass to build the graph with filtering
     const insertNode = async (node: CallHierarchyNode, depth = 0) => {
         if (maxDepth > 0 && depth >= maxDepth) return
         output.appendLine('resolve: ' + node.item.name)
@@ -85,6 +91,39 @@ async function getCallNode(
             | vscode.CallHierarchyOutgoingCall[]
             | vscode.CallHierarchyIncomingCall[] =
             await vscode.commands.executeCommand(command, node.item)
+
+        if (outgoing) {
+            calls.sort((a, b) => {
+                if (
+                    !(a instanceof vscode.CallHierarchyOutgoingCall) ||
+                    !(b instanceof vscode.CallHierarchyOutgoingCall)
+                ) {
+                    return 0
+                }
+
+                const aRanges = a.fromRanges
+                const bRanges = b.fromRanges
+
+                if (
+                    !aRanges ||
+                    !aRanges.length ||
+                    !bRanges ||
+                    !bRanges.length
+                ) {
+                    return 0
+                }
+
+                const aPos = aRanges[0].start
+                const bPos = bRanges[0].start
+
+                if (aPos.line !== bPos.line) {
+                    return aPos.line - bPos.line
+                }
+
+                return aPos.character - bPos.character
+            })
+        }
+
         await Promise.all(
             calls.map(call => {
                 const next =
@@ -96,16 +135,13 @@ async function getCallNode(
                     return null
                 }
 
-                // Create a unique key for the node
                 const nodeKey = `${next.name}|${next.uri.toString()}|${next.range.start.line}:${next.range.start.character}`
 
-                // Get in-degree for this node
                 const inDegree = inDegreeMap.get(nodeKey) || 0
                 output.appendLine(
                     `Node ${next.name} has in-degree: ${inDegree}, threshold: ${inDegreeThreshold}`,
                 )
 
-                // Filter nodes based on in-degree threshold (only for incoming call graphs)
                 if (
                     outgoing &&
                     inDegreeThreshold > 0 &&
@@ -128,10 +164,13 @@ async function getCallNode(
                 }
                 if (isSkip) return null
 
+                const sourcePosition = sourcePositionMap.get(nodeKey)
+
                 const child = {
                     item: next,
                     children: [],
                     inDegree: inDegree,
+                    sourcePosition: sourcePosition,
                 }
                 node.children.push(child)
                 return insertNode(child, depth + 1)
@@ -145,11 +184,9 @@ async function getCallNode(
         inDegree: 0,
     }
 
-    // For incoming call graphs, we need to calculate in-degrees first
     if (outgoing && inDegreeThreshold > 0) {
         nodes.add(graph)
         await calculateInDegrees(graph)
-        // Clear nodes set for the second pass
         nodes.clear()
     }
 

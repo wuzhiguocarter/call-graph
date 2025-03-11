@@ -2,7 +2,7 @@
     "name": "callviz",
     "displayName": "callviz",
     "description": "Callgraph Visualization for vscode",
-    "version": "1.2.8",
+    "version": "1.2.9",
     "publisher": "WuZhiguo",
     "engines": {
         "vscode": "^1.65.0"

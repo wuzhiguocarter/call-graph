@@ -107,8 +107,39 @@ function traverseForCallGraph(
         participants.set(callerPath, callerShortName)
     }
 
+    // Sort children by source position before processing
+    const sortedChildren = [...node.children].sort((a, b) => {
+        // If both nodes have source positions, sort by line and character
+        if (a.sourcePosition && b.sourcePosition) {
+            if (a.sourcePosition.line !== b.sourcePosition.line) {
+                return a.sourcePosition.line - b.sourcePosition.line
+            }
+            return a.sourcePosition.character - b.sourcePosition.character
+        }
+
+        // If only one has source position, prioritize the one with position
+        if (a.sourcePosition) return -1
+        if (b.sourcePosition) return 1
+
+        // If neither has source position, maintain original order
+        return 0
+    })
+
+    // Log the sorted order for debugging
+    if (sortedChildren.length > 1) {
+        output.appendLine(
+            `Sorted ${sortedChildren.length} children of ${node.item.name} by source position`,
+        )
+        sortedChildren.forEach((child, index) => {
+            const pos = child.sourcePosition
+                ? `Line ${child.sourcePosition.line}, Char ${child.sourcePosition.character}`
+                : 'No position'
+            output.appendLine(`  ${index}: ${child.item.name} (${pos})`)
+        })
+    }
+
     // 处理子节点时动态添加被调用方
-    node.children.forEach(child => {
+    sortedChildren.forEach(child => {
         // Apply in-degree filtering - skip nodes with high in-degree
         if (
             inDegreeThreshold > 0 &&
