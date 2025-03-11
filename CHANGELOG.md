@@ -2,6 +2,10 @@
 
 ## [1.2.6] 2025-03-06
 
+- Added Mermaid sequence diagram generation feature
+  - Generate sequence diagrams based on function call order from AST traversal
+  - New commands: "Show outgoing sequence diagram" and "Show incoming sequence diagram"
+  - Interactive diagram viewing with SVG and Mermaid file export options
 - Updated repository URLs
 - Renamed extension to "callviz" for marketplace uniqueness
 

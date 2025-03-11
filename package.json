@@ -14,8 +14,12 @@
     "activationEvents": [
         "onCommand:CallGraph.showOutgoingCallGraph",
         "onCommand:CallGraph.showIncomingCallGraph",
-        "onWebviewPanel:CallGraph.previewIncoming",
-        "onWebviewPanel:CallGraph.previewOutgoing"
+        "onCommand:CallGraph.showOutgoingSequenceDiagram",
+        "onCommand:CallGraph.showIncomingSequenceDiagram",
+        "onWebviewPanel:CallGraph.previewGraphIncoming",
+        "onWebviewPanel:CallGraph.previewGraphOutgoing",
+        "onWebviewPanel:CallGraph.previewSequenceIncoming",
+        "onWebviewPanel:CallGraph.previewSequenceOutgoing"
     ],
     "main": "./out/extension.js",
     "contributes": {
@@ -27,6 +31,14 @@
             {
                 "command": "CallGraph.showIncomingCallGraph",
                 "title": "CallGraph: Show incoming call graph"
+            },
+            {
+                "command": "CallGraph.showOutgoingSequenceDiagram",
+                "title": "CallGraph: Show outgoing sequence diagram"
+            },
+            {
+                "command": "CallGraph.showIncomingSequenceDiagram",
+                "title": "CallGraph: Show incoming sequence diagram"
             }
         ],
         "menus": {
@@ -36,6 +48,12 @@
                 },
                 {
                     "command": "CallGraph.showIncomingCallGraph"
+                },
+                {
+                    "command": "CallGraph.showOutgoingSequenceDiagram"
+                },
+                {
+                    "command": "CallGraph.showIncomingSequenceDiagram"
                 }
             ]
         },
