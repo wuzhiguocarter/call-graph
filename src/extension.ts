@@ -6,6 +6,7 @@ import {
 } from './call'
 import { generateDot } from './dot'
 import { generateMermaid } from './mermaid'
+import { generateClassDiagram } from './class'
 import * as path from 'path'
 import * as fs from 'fs'
 import ignore from 'ignore'
@@ -23,13 +24,17 @@ const getDefaultProgressOptions = (title: string): vscode.ProgressOptions => {
 const getHtmlContent = (
     staticDir: string,
     fileUri: string,
-    diagramType: 'Graph' | 'Sequence' = 'Graph',
+    diagramType: 'Graph' | 'Sequence' | 'Class' = 'Graph',
 ) => {
     const htmlTemplate = fs
         .readFileSync(
             path.resolve(
                 staticDir,
-                diagramType === 'Graph' ? 'index.html' : 'sequence.html',
+                diagramType === 'Graph'
+                    ? 'index.html'
+                    : diagramType === 'Sequence'
+                      ? 'sequence.html'
+                      : 'class.html',
             ),
         )
         .toString()
@@ -49,7 +54,7 @@ const generateDiagram = (
     outputFile: vscode.Uri,
     staticDir: string,
     onReceiveMsg: (msg: WebviewMsg) => void,
-    diagramType: 'Graph' | 'Sequence' = 'Graph',
+    diagramType: 'Graph' | 'Sequence' | 'Class' = 'Graph',
 ) => {
     return async () => {
         const activeTextEditor = vscode.window.activeTextEditor
@@ -94,14 +99,16 @@ const generateDiagram = (
 
         if (diagramType === 'Graph') {
             generateDot(graph, outputFile.fsPath)
-        } else {
+        } else if (diagramType === 'Sequence') {
             generateMermaid(graph, outputFile.fsPath)
+        } else if (diagramType === 'Class') {
+            generateClassDiagram(graph, outputFile.fsPath)
         }
 
         const webviewType = `CallGraph.preview${diagramType}${type}`
         const panel = vscode.window.createWebviewPanel(
             webviewType,
-            `${diagramType === 'Graph' ? 'Call Graph' : 'Sequence Diagram'} ${type}`,
+            `${diagramType === 'Graph' ? 'Call Graph' : diagramType === 'Sequence' ? 'Sequence Diagram' : 'Class Diagram'} ${type}`,
             vscode.ViewColumn.Beside,
             {
                 localResourceRoots: [vscode.Uri.file(staticDir)],
@@ -166,20 +173,30 @@ export function activate(context: vscode.ExtensionContext) {
     const mermaidFileIncoming = vscode.Uri.file(
         path.resolve(staticDir, 'sequence_data_incoming.mmd'),
     )
+    const classFileOutgoing = vscode.Uri.file(
+        path.resolve(staticDir, 'class_data_outgoing.mmd'),
+    )
+    const classFileIncoming = vscode.Uri.file(
+        path.resolve(staticDir, 'class_data_incoming.mmd'),
+    )
     const onReceiveMsgFactory =
         (
             type: 'Incoming' | 'Outgoing',
-            diagramType: 'Graph' | 'Sequence' = 'Graph',
+            diagramType: 'Graph' | 'Sequence' | 'Class' = 'Graph',
         ) =>
         (msg: WebviewMsg) => {
             const savedName =
                 type === 'Incoming'
                     ? diagramType === 'Graph'
                         ? 'call_graph_incoming'
-                        : 'sequence_diagram_incoming'
+                        : diagramType === 'Sequence'
+                          ? 'sequence_diagram_incoming'
+                          : 'class_diagram_incoming'
                     : diagramType === 'Graph'
                       ? 'call_graph_outgoing'
-                      : 'sequence_diagram_outgoing'
+                      : diagramType === 'Sequence'
+                        ? 'sequence_diagram_outgoing'
+                        : 'class_diagram_outgoing'
             if (msg.command === 'download') {
                 const onDowload = async (fileType: 'dot' | 'svg') => {
                     const f = await vscode.window.showSaveDialog({
@@ -310,6 +327,39 @@ export function activate(context: vscode.ExtensionContext) {
             )
         },
     )
+    // New commands for class diagrams
+    const incomingClassDisposable = vscode.commands.registerCommand(
+        'CallGraph.showIncomingClassDiagram',
+        async () => {
+            vscode.window.withProgress(
+                getDefaultProgressOptions('Generate class diagram'),
+                generateDiagram(
+                    'Incoming',
+                    getIncomingCallNode,
+                    classFileIncoming,
+                    staticDir,
+                    onReceiveMsgFactory('Incoming', 'Class'),
+                    'Class',
+                ),
+            )
+        },
+    )
+    const outgoingClassDisposable = vscode.commands.registerCommand(
+        'CallGraph.showOutgoingClassDiagram',
+        async () => {
+            vscode.window.withProgress(
+                getDefaultProgressOptions('Generate class diagram'),
+                generateDiagram(
+                    'Outgoing',
+                    getOutgoingCallNode,
+                    classFileOutgoing,
+                    staticDir,
+                    onReceiveMsgFactory('Outgoing', 'Class'),
+                    'Class',
+                ),
+            )
+        },
+    )
     // Register serializers for call graph webviews
     registerWebviewPanelSerializer(
         staticDir,
@@ -334,11 +384,25 @@ export function activate(context: vscode.ExtensionContext) {
         onReceiveMsgFactory('Outgoing', 'Sequence'),
     )
 
+    // Register serializers for class diagram webviews
+    registerWebviewPanelSerializer(
+        staticDir,
+        `CallGraph.previewClassIncoming`,
+        onReceiveMsgFactory('Incoming', 'Class'),
+    )
+    registerWebviewPanelSerializer(
+        staticDir,
+        'CallGraph.previewClassOutgoing',
+        onReceiveMsgFactory('Outgoing', 'Class'),
+    )
+
     // Add all disposables to context
     context.subscriptions.push(
         incomingDisposable,
         outgoingDisposable,
         incomingSequenceDisposable,
         outgoingSequenceDisposable,
+        incomingClassDisposable,
+        outgoingClassDisposable,
     )
 }

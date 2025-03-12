@@ -1,0 +1,371 @@
+<!doctype html>
+<html lang="zh-CN">
+    <head>
+        <meta charset="UTF-8" />
+        <title>类图查看器</title>
+        <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+        <style>
+            :root {
+                --bg-color: #ffffff;
+                --text-color: #333333;
+            }
+            body {
+                margin: 0;
+                padding: 20px;
+                background-color: var(--bg-color);
+                color: var(--text-color);
+                overflow: hidden;
+            }
+            .toolbar {
+                margin-bottom: 20px;
+                display: flex;
+                gap: 10px;
+                flex-wrap: wrap;
+            }
+            button {
+                padding: 8px 15px;
+                background: #409eff;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                cursor: pointer;
+                transition: opacity 0.3s;
+            }
+            button:hover {
+                opacity: 0.8;
+            }
+            #chart-container {
+                border: 1px solid #eee;
+                padding: 20px;
+                border-radius: 4px;
+                overflow: auto;
+                height: 80vh;
+                display: flex;
+                /* justify-content: center; */
+            }
+            .error {
+                color: #f56c6c;
+                padding: 10px;
+                border: 1px solid currentColor;
+                border-radius: 4px;
+                margin-top: 10px;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="toolbar">
+            <button onclick="zoomIn()">放大</button>
+            <button onclick="zoomOut()">缩小</button>
+            <button onclick="resetView()">最佳视野</button>
+            <button onclick="exportSVG()">导出SVG</button>
+            <button onclick="downloadMMD()">下载源码</button>
+        </div>
+        <div id="chart-container"></div>
+
+        <script>
+            const vscode = acquireVsCodeApi()
+            vscode.setState('$MERMAID_FILE_URI')
+
+            function initMermaid() {
+                const style = getComputedStyle(document.body)
+                mermaid.initialize({
+                    startOnLoad: false,
+                    theme: 'base',
+                    themeVariables: {
+                        background: style.getPropertyValue('--bg-color').trim(),
+                        primaryColor: '#409eff',
+                        textColor: style
+                            .getPropertyValue('--text-color')
+                            .trim(),
+                        // Customize class boxes - all backgrounds to white
+                        classText: style
+                            .getPropertyValue('--text-color')
+                            .trim(),
+                        classBorder: '#409eff',
+                        classBkg: '#ffffff',
+
+                        // Additional class diagram specific settings
+                        nodeBkg: '#ffffff',
+                        mainBkg: '#ffffff',
+                        nodeTextColor: style
+                            .getPropertyValue('--text-color')
+                            .trim(),
+
+                        // Ensure all node types have white background
+                        clusterBkg: '#ffffff',
+                        titleColor: style
+                            .getPropertyValue('--text-color')
+                            .trim(),
+                        edgeLabelBackground: '#ffffff',
+
+                        // Make sure relationship lines are visible
+                        lineColor: '#333333',
+                    },
+                })
+            }
+
+            function renderMermaid() {
+                const container = document.getElementById('chart-container')
+                container.innerHTML = '<div class="loading">加载中...</div>'
+
+                fetch(vscode.getState() || 'example.mmd')
+                    .then(response => response.text())
+                    .then(text => {
+                        container.innerHTML = text
+                        return mermaid.render('mermaid-svg', text)
+                    })
+                    .then(({ svg }) => {
+                        container.innerHTML = svg
+                        const svgElement = container.querySelector('svg')
+                        if (svgElement) {
+                            // Store original SVG for export
+                            window.originalSVG = svg
+                            // Initialize pan/zoom
+                            initPanZoom(svgElement)
+                            // Set initial view
+                            resetView()
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error rendering Mermaid diagram:', error)
+                        showError(error)
+                    })
+            }
+
+            let scale = 1
+            let isPanning = false
+            let startPoint = { x: 0, y: 0 }
+            let viewBox = { x: 0, y: 0, w: 0, h: 0 }
+            let svgElement = null
+
+            function initPanZoom(svg) {
+                svgElement = svg
+                svg.addEventListener('wheel', handleMouseWheel)
+                svg.addEventListener('mousedown', startDragging)
+                svg.addEventListener('mousemove', whileDragging)
+                svg.addEventListener('mouseup', endDragging)
+                svg.addEventListener('mouseleave', endDragging)
+            }
+
+            function handleMouseWheel(e) {
+                e.preventDefault()
+                if (!svgElement) return
+
+                const direction = e.deltaY < 0 ? 1 : -1
+                const factor = 0.1
+                const zoom = 1 + factor * direction
+
+                // Get mouse position relative to SVG
+                const svgRect = svgElement.getBoundingClientRect()
+                const mouseX = e.clientX - svgRect.left
+                const mouseY = e.clientY - svgRect.top
+
+                // Calculate new scale
+                const oldScale = scale
+                scale = Math.max(0.1, Math.min(10, scale * zoom))
+
+                // Adjust viewBox to zoom around mouse position
+                const mouseXInSVG = viewBox.x + mouseX / oldScale
+                const mouseYInSVG = viewBox.y + mouseY / oldScale
+
+                viewBox.x = mouseXInSVG - mouseX / scale
+                viewBox.y = mouseYInSVG - mouseY / scale
+                viewBox.w = svgElement.clientWidth / scale
+                viewBox.h = svgElement.clientHeight / scale
+
+                updateSVGViewBox()
+            }
+
+            function startDragging(e) {
+                if (e.button !== 0) return // Only left button
+                isPanning = true
+                startPoint = { x: e.clientX, y: e.clientY }
+            }
+
+            function whileDragging(e) {
+                if (!isPanning || !svgElement) return
+
+                const dx = (e.clientX - startPoint.x) / scale
+                const dy = (e.clientY - startPoint.y) / scale
+
+                viewBox.x -= dx
+                viewBox.y -= dy
+
+                updateSVGViewBox()
+                startPoint = { x: e.clientX, y: e.clientY }
+            }
+
+            function endDragging() {
+                isPanning = false
+            }
+
+            function updateSVGViewBox() {
+                if (!svgElement) return
+                const viewBoxStr = `${viewBox.x} ${viewBox.y} ${viewBox.w} ${viewBox.h}`
+                svgElement.setAttribute('viewBox', viewBoxStr)
+            }
+
+            function zoomIn() {
+                if (!svgElement) return
+                scale = Math.min(10, scale * 1.2)
+                viewBox.w = svgElement.clientWidth / scale
+                viewBox.h = svgElement.clientHeight / scale
+                updateSVGViewBox()
+            }
+
+            function zoomOut() {
+                if (!svgElement) return
+                scale = Math.max(0.1, scale / 1.2)
+                viewBox.w = svgElement.clientWidth / scale
+                viewBox.h = svgElement.clientHeight / scale
+                updateSVGViewBox()
+            }
+
+            function resetView() {
+                if (!svgElement) return
+
+                // Get the dimensions of the SVG content
+                let bbox
+                try {
+                    // Try to get the bounding box of the diagram
+                    const diagramGroup = svgElement.querySelector('.mermaid')
+                    if (diagramGroup) {
+                        bbox = diagramGroup.getBBox()
+                    } else {
+                        // Fallback to the whole SVG
+                        bbox = svgElement.getBBox()
+                    }
+                } catch (e) {
+                    console.error('Error getting bounding box:', e)
+                    // Fallback dimensions
+                    bbox = { x: 0, y: 0, width: 800, height: 600 }
+                }
+
+                // Add padding
+                const padding = 20
+                bbox.x -= padding
+                bbox.y -= padding
+                bbox.width += padding * 2
+                bbox.height += padding * 2
+
+                // Calculate scale to fit the content
+                const containerWidth = svgElement.clientWidth
+                const containerHeight = svgElement.clientHeight
+                const scaleX = containerWidth / bbox.width
+                const scaleY = containerHeight / bbox.height
+                scale = Math.min(scaleX, scaleY, 1) // Limit to 1x for readability
+
+                // Update viewBox
+                viewBox = {
+                    x: bbox.x,
+                    y: bbox.y,
+                    w: containerWidth / scale,
+                    h: containerHeight / scale,
+                }
+
+                updateSVGViewBox()
+            }
+
+            function exportSVG() {
+                if (!window.originalSVG) {
+                    showError('No SVG to export')
+                    return
+                }
+
+                try {
+                    // Create a clean SVG for export
+                    const parser = new DOMParser()
+                    const svgDoc = parser.parseFromString(
+                        window.originalSVG,
+                        'image/svg+xml',
+                    )
+                    const svgElement = svgDoc.documentElement
+
+                    // Get the bounding box
+                    const bbox = svgElement.getBBox
+                        ? svgElement.getBBox()
+                        : { x: 0, y: 0, width: 800, height: 600 }
+
+                    // Set proper viewBox and dimensions
+                    svgElement.setAttribute(
+                        'viewBox',
+                        `${bbox.x} ${bbox.y} ${bbox.width} ${bbox.height}`,
+                    )
+                    svgElement.setAttribute('width', `${bbox.width}`)
+                    svgElement.setAttribute('height', `${bbox.height}`)
+
+                    // Serialize to string
+                    const serializer = new XMLSerializer()
+                    const svgString = serializer.serializeToString(svgElement)
+
+                    // Send to VSCode for saving
+                    vscode.postMessage({
+                        command: 'exportFile',
+                        data: svgString,
+                        contentType: 'image/svg+xml',
+                        filename: 'class_diagram.svg',
+                    })
+                } catch (error) {
+                    console.error('Error exporting SVG:', error)
+                    showError(error)
+                }
+            }
+
+            function downloadMMD() {
+                fetch(vscode.getState() || 'example.mmd')
+                    .then(response => response.text())
+                    .then(text => {
+                        vscode.postMessage({
+                            command: 'exportFile',
+                            data: text,
+                            contentType: 'text/plain',
+                            filename: 'class_diagram.mmd',
+                        })
+                    })
+                    .catch(error => {
+                        console.error(
+                            'Error downloading Mermaid source:',
+                            error,
+                        )
+                        showError(error)
+                    })
+            }
+
+            function showError(error) {
+                const container = document.getElementById('chart-container')
+                const errorDiv = document.createElement('div')
+                errorDiv.className = 'error'
+                errorDiv.textContent = `Error: ${error.message || error}`
+                container.appendChild(errorDiv)
+            }
+
+            // Handle window resize to adjust SVG dimensions
+            function handleWindowResize() {
+                if (!svgElement) return
+
+                // Update viewBox dimensions based on new container size
+                viewBox.w = svgElement.clientWidth / scale
+                viewBox.h = svgElement.clientHeight / scale
+                updateSVGViewBox()
+
+                // If the diagram is very small, reset the view
+                if (scale < 0.2) {
+                    resetView()
+                }
+            }
+
+            // Add window resize event listener
+            window.addEventListener('resize', handleWindowResize)
+
+            initMermaid()
+            renderMermaid()
+
+            // Handle VSCode theme changes
+            window.addEventListener('message', event => {
+                if (event.data.type === 'theme-changed') {
+                    document.location.reload()
+                }
+            })
+        </script>
+    </body>
+</html>

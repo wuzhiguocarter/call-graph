@@ -2,7 +2,7 @@
     "name": "callviz",
     "displayName": "callviz",
     "description": "Callgraph Visualization for vscode",
-    "version": "1.2.9",
+    "version": "1.3.0",
     "publisher": "WuZhiguo",
     "engines": {
         "vscode": "^1.65.0"
@@ -16,10 +16,14 @@
         "onCommand:CallGraph.showIncomingCallGraph",
         "onCommand:CallGraph.showOutgoingSequenceDiagram",
         "onCommand:CallGraph.showIncomingSequenceDiagram",
+        "onCommand:CallGraph.showOutgoingClassDiagram",
+        "onCommand:CallGraph.showIncomingClassDiagram",
         "onWebviewPanel:CallGraph.previewGraphIncoming",
         "onWebviewPanel:CallGraph.previewGraphOutgoing",
         "onWebviewPanel:CallGraph.previewSequenceIncoming",
-        "onWebviewPanel:CallGraph.previewSequenceOutgoing"
+        "onWebviewPanel:CallGraph.previewSequenceOutgoing",
+        "onWebviewPanel:CallGraph.previewClassIncoming",
+        "onWebviewPanel:CallGraph.previewClassOutgoing"
     ],
     "main": "./out/extension.js",
     "contributes": {
@@ -39,6 +43,14 @@
             {
                 "command": "CallGraph.showIncomingSequenceDiagram",
                 "title": "CallGraph: Show incoming sequence diagram"
+            },
+            {
+                "command": "CallGraph.showOutgoingClassDiagram",
+                "title": "CallGraph: Show outgoing class diagram"
+            },
+            {
+                "command": "CallGraph.showIncomingClassDiagram",
+                "title": "CallGraph: Show incoming class diagram"
             }
         ],
         "menus": {
@@ -54,6 +66,12 @@
                 },
                 {
                     "command": "CallGraph.showIncomingSequenceDiagram"
+                },
+                {
+                    "command": "CallGraph.showOutgoingClassDiagram"
+                },
+                {
+                    "command": "CallGraph.showIncomingClassDiagram"
                 }
             ]
         },

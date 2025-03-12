@@ -1,5 +1,13 @@
 # Change Log
 
+## [1.3.0] 2025-03-12
+
+- Added class diagram generation and visualization feature
+  - New commands: "Show outgoing class diagram" and "Show incoming class diagram"
+  - Generate class diagrams based on function call relationships
+  - Interactive diagram viewing with SVG and Mermaid file export options
+  - Consistent UI with sequence diagram feature
+
 ## [1.2.9] 2025-03-11
 
 - Improved sequence diagram accuracy with source position-based ordering
