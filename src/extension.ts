@@ -7,6 +7,7 @@ import {
 import { generateDot } from './dot'
 import { generateMermaid } from './mermaid'
 import { generateClassDiagram } from './class'
+import { generateControlFlowDiagram } from './controlflow'
 import * as path from 'path'
 import * as fs from 'fs'
 import ignore from 'ignore'
@@ -24,7 +25,7 @@ const getDefaultProgressOptions = (title: string): vscode.ProgressOptions => {
 const getHtmlContent = (
     staticDir: string,
     fileUri: string,
-    diagramType: 'Graph' | 'Sequence' | 'Class' = 'Graph',
+    diagramType: 'Graph' | 'Sequence' | 'Class' | 'ControlFlow' = 'Graph',
 ) => {
     const htmlTemplate = fs
         .readFileSync(
@@ -34,7 +35,9 @@ const getHtmlContent = (
                     ? 'index.html'
                     : diagramType === 'Sequence'
                       ? 'sequence.html'
-                      : 'class.html',
+                      : diagramType === 'Class'
+                        ? 'class.html'
+                        : 'controlflow.html',
             ),
         )
         .toString()
@@ -45,6 +48,7 @@ const getHtmlContent = (
         return htmlTemplate.split('$MERMAID_FILE_URI').join(fileUri)
     }
 }
+
 const generateDiagram = (
     type: 'Incoming' | 'Outgoing',
     callNodeFunction: (
@@ -54,7 +58,7 @@ const generateDiagram = (
     outputFile: vscode.Uri,
     staticDir: string,
     onReceiveMsg: (msg: WebviewMsg) => void,
-    diagramType: 'Graph' | 'Sequence' | 'Class' = 'Graph',
+    diagramType: 'Graph' | 'Sequence' | 'Class' | 'ControlFlow' = 'Graph',
 ) => {
     return async () => {
         const activeTextEditor = vscode.window.activeTextEditor
@@ -103,12 +107,14 @@ const generateDiagram = (
             generateMermaid(graph, outputFile.fsPath)
         } else if (diagramType === 'Class') {
             generateClassDiagram(graph, outputFile.fsPath)
+        } else if (diagramType === 'ControlFlow') {
+            generateControlFlowDiagram(graph, outputFile.fsPath)
         }
 
         const webviewType = `CallGraph.preview${diagramType}${type}`
         const panel = vscode.window.createWebviewPanel(
             webviewType,
-            `${diagramType === 'Graph' ? 'Call Graph' : diagramType === 'Sequence' ? 'Sequence Diagram' : 'Class Diagram'} ${type}`,
+            `${diagramType === 'Graph' ? 'Call Graph' : diagramType === 'Sequence' ? 'Sequence Diagram' : diagramType === 'Class' ? 'Class Diagram' : 'Control Flow Diagram'} ${type}`,
             vscode.ViewColumn.Beside,
             {
                 localResourceRoots: [vscode.Uri.file(staticDir)],
@@ -179,10 +185,21 @@ export function activate(context: vscode.ExtensionContext) {
     const classFileIncoming = vscode.Uri.file(
         path.resolve(staticDir, 'class_data_incoming.mmd'),
     )
+    const controlFlowFileOutgoing = vscode.Uri.file(
+        path.resolve(staticDir, 'controlflow_data_outgoing.mmd'),
+    )
+    const controlFlowFileIncoming = vscode.Uri.file(
+        path.resolve(staticDir, 'controlflow_data_incoming.mmd'),
+    )
+
     const onReceiveMsgFactory =
         (
             type: 'Incoming' | 'Outgoing',
-            diagramType: 'Graph' | 'Sequence' | 'Class' = 'Graph',
+            diagramType:
+                | 'Graph'
+                | 'Sequence'
+                | 'Class'
+                | 'ControlFlow' = 'Graph',
         ) =>
         (msg: WebviewMsg) => {
             const savedName =
@@ -191,12 +208,16 @@ export function activate(context: vscode.ExtensionContext) {
                         ? 'call_graph_incoming'
                         : diagramType === 'Sequence'
                           ? 'sequence_diagram_incoming'
-                          : 'class_diagram_incoming'
+                          : diagramType === 'Class'
+                            ? 'class_diagram_incoming'
+                            : 'controlflow_diagram_incoming'
                     : diagramType === 'Graph'
                       ? 'call_graph_outgoing'
                       : diagramType === 'Sequence'
                         ? 'sequence_diagram_outgoing'
-                        : 'class_diagram_outgoing'
+                        : diagramType === 'Class'
+                          ? 'class_diagram_outgoing'
+                          : 'controlflow_diagram_outgoing'
             if (msg.command === 'download') {
                 const onDowload = async (fileType: 'dot' | 'svg') => {
                     const f = await vscode.window.showSaveDialog({
@@ -261,6 +282,7 @@ export function activate(context: vscode.ExtensionContext) {
                 handleExport()
             }
         }
+
     const incomingDisposable = vscode.commands.registerCommand(
         'CallGraph.showIncomingCallGraph',
         async () => {
@@ -360,6 +382,44 @@ export function activate(context: vscode.ExtensionContext) {
             )
         },
     )
+    // New commands for control flow diagrams
+    const incomingControlFlowDisposable = vscode.commands.registerCommand(
+        'CallGraph.showIncomingControlFlowDiagram',
+        async () => {
+            vscode.window.withProgress(
+                getDefaultProgressOptions(
+                    'Generate incoming control flow diagram',
+                ),
+                generateDiagram(
+                    'Incoming',
+                    getIncomingCallNode,
+                    controlFlowFileIncoming,
+                    staticDir,
+                    onReceiveMsgFactory('Incoming', 'ControlFlow'),
+                    'ControlFlow',
+                ),
+            )
+        },
+    )
+    const outgoingControlFlowDisposable = vscode.commands.registerCommand(
+        'CallGraph.showOutgoingControlFlowDiagram',
+        async () => {
+            vscode.window.withProgress(
+                getDefaultProgressOptions(
+                    'Generate outgoing control flow diagram',
+                ),
+                generateDiagram(
+                    'Outgoing',
+                    getOutgoingCallNode,
+                    controlFlowFileOutgoing,
+                    staticDir,
+                    onReceiveMsgFactory('Outgoing', 'ControlFlow'),
+                    'ControlFlow',
+                ),
+            )
+        },
+    )
+
     // Register serializers for call graph webviews
     registerWebviewPanelSerializer(
         staticDir,
@@ -396,6 +456,18 @@ export function activate(context: vscode.ExtensionContext) {
         onReceiveMsgFactory('Outgoing', 'Class'),
     )
 
+    // Register serializers for control flow diagram webviews
+    registerWebviewPanelSerializer(
+        staticDir,
+        'CallGraph.previewControlFlowIncoming',
+        onReceiveMsgFactory('Incoming', 'ControlFlow'),
+    )
+    registerWebviewPanelSerializer(
+        staticDir,
+        'CallGraph.previewControlFlowOutgoing',
+        onReceiveMsgFactory('Outgoing', 'ControlFlow'),
+    )
+
     // Add all disposables to context
     context.subscriptions.push(
         incomingDisposable,
@@ -404,5 +476,7 @@ export function activate(context: vscode.ExtensionContext) {
         outgoingSequenceDisposable,
         incomingClassDisposable,
         outgoingClassDisposable,
+        incomingControlFlowDisposable,
+        outgoingControlFlowDisposable,
     )
 }

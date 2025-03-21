@@ -18,12 +18,16 @@
         "onCommand:CallGraph.showIncomingSequenceDiagram",
         "onCommand:CallGraph.showOutgoingClassDiagram",
         "onCommand:CallGraph.showIncomingClassDiagram",
+        "onCommand:CallGraph.showOutgoingControlFlowDiagram",
+        "onCommand:CallGraph.showIncomingControlFlowDiagram",
         "onWebviewPanel:CallGraph.previewGraphIncoming",
         "onWebviewPanel:CallGraph.previewGraphOutgoing",
         "onWebviewPanel:CallGraph.previewSequenceIncoming",
         "onWebviewPanel:CallGraph.previewSequenceOutgoing",
         "onWebviewPanel:CallGraph.previewClassIncoming",
-        "onWebviewPanel:CallGraph.previewClassOutgoing"
+        "onWebviewPanel:CallGraph.previewClassOutgoing",
+        "onWebviewPanel:CallGraph.previewControlFlowIncoming",
+        "onWebviewPanel:CallGraph.previewControlFlowOutgoing"
     ],
     "main": "./out/extension.js",
     "contributes": {
@@ -51,6 +55,14 @@
             {
                 "command": "CallGraph.showIncomingClassDiagram",
                 "title": "CallGraph: Show incoming class diagram"
+            },
+            {
+                "command": "CallGraph.showOutgoingControlFlowDiagram",
+                "title": "CallGraph: Show outgoing control flow diagram"
+            },
+            {
+                "command": "CallGraph.showIncomingControlFlowDiagram",
+                "title": "CallGraph: Show incoming control flow diagram"
             }
         ],
         "menus": {
@@ -72,6 +84,12 @@
                 },
                 {
                     "command": "CallGraph.showIncomingClassDiagram"
+                },
+                {
+                    "command": "CallGraph.showOutgoingControlFlowDiagram"
+                },
+                {
+                    "command": "CallGraph.showIncomingControlFlowDiagram"
                 }
             ]
         },

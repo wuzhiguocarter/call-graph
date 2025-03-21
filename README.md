@@ -9,6 +9,7 @@ vscode extension for generate call graph in [graphviz dot language](https://www.
 -   Generate call graph in graphviz dot language and preview
 -   Generate sequence diagrams using Mermaid syntax
 -   Generate class diagrams using Mermaid syntax
+-   Generate control flow diagrams using Mermaid syntax
 -   Save graph as dot or svg file
 -   Export sequence and class diagrams as SVG or download source code
 -   Intelligent filtering of high in-degree nodes to reduce diagram complexity
@@ -22,9 +23,10 @@ vscode extension for generate call graph in [graphviz dot language](https://www.
 3. Or Run `CallGraph.showIncomingCallGraph` command using context menu or `Ctrl+Shift+P` to show incoming calls
 4. For sequence diagrams, use `CallGraph.showOutgoingSequenceDiagram` or `CallGraph.showIncomingSequenceDiagram`
 5. For class diagrams, use `CallGraph.showOutgoingClassDiagram` or `CallGraph.showIncomingClassDiagram`
-6. Click `save dot file` or `save as svg` in the bottom left corner to save the graph
-7. For sequence and class diagrams, use the "Export SVG" or "Download Source Code" buttons
-8. Add `.callgraphignore` file in your project root directory to ignore some files or folders in workspace (the syntax is the same as `.gitignore`)
+6. For control flow diagrams, use `CallGraph.showOutgoingControlFlowDiagram` or `CallGraph.showIncomingControlFlowDiagram`
+7. Click `save dot file` or `save as svg` in the bottom left corner to save the graph
+8. For sequence and class diagrams, use the "Export SVG" or "Download Source Code" buttons
+9. Add `.callgraphignore` file in your project root directory to ignore some files or folders in workspace (the syntax is the same as `.gitignore`)
 
 ## Configuration
 
@@ -35,6 +37,13 @@ You can configure `ignoreFile`(.callgraphignore by default), `maxDepth`, and `in
 - `inDegreeThreshold`: Filter nodes with in-degree greater than this threshold in incoming call graphs (default: 5)
 
 ## Recent Updates
+
+### Control Flow Diagrams
+- Added support for generating control flow diagrams using Mermaid flowchart syntax
+- Control flow diagrams visualize the execution path of your code
+- Interactive diagram with zoom, pan, and export capabilities
+- Consistent filtering of high in-degree nodes to reduce diagram complexity
+- Export control flow diagrams as SVG or download the Mermaid source code
 
 ### Class Diagrams
 - Added support for generating class diagrams using Mermaid syntax
@@ -66,10 +75,6 @@ See [CHANGELOG.md](./CHANGELOG.md).
 
 ## For more information
 
--   [GitHub Repository](https://github.com/beicause/call-graph)
-
-## Donate
-
-[Donate me via Paypal](https://paypal.me/beicause). Thank you for you support to this project and my open source works.
+-   [GitHub Repository](https://github.com/wuzhiguocarter/call-graph.git)
 
 **Enjoy!**
