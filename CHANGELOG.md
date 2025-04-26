@@ -1,5 +1,12 @@
 # Change Log
 
+## [1.3.0] 2024-12-25
+
+- **New Feature**: Added clickable elements in sequence diagrams that navigate to code definitions
+- Improved user experience with hover effects on diagram nodes
+- Added visual feedback when navigating to code definitions
+- Updated documentation to reflect new navigation capabilities
+
 ## [1.2.3] 2024-12-19
 
 -   fix the issue that can't run any commands from v1.2.2 ([#31](https://github.com/beicause/call-graph/issues/31)).

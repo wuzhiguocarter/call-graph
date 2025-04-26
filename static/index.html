@@ -30,6 +30,51 @@
                 .attr('viewBox', [0, 0, width, height].join(' '))
         }
 
+        function makeElementsClickable() {
+            // Find all nodes in the graph
+            const nodes = d3.selectAll('.node')
+            
+            // Add click event listeners to nodes
+            nodes.each(function() {
+                const node = d3.select(this)
+                
+                // Make the node look clickable
+                node.style('cursor', 'pointer')
+                
+                // Add hover effect
+                node.on('mouseover', function() {
+                    d3.select(this).select('polygon, ellipse').style('stroke-width', '2px').style('stroke', '#4285f4')
+                })
+                
+                node.on('mouseout', function() {
+                    d3.select(this).select('polygon, ellipse').style('stroke-width', '1px').style('stroke', 'black')
+                })
+                
+                // Add click handler
+                node.on('click', function() {
+                    // Extract the node title which contains file path and position information
+                    const title = d3.select(this).select('title').text()
+                    
+                    // Parse the title to get file path and position
+                    // Format is typically: "filepath#symbolName@line:character"
+                    const match = title.match(/"([^"]+)#([^@]+)@(\d+):(\d+)"/)
+                    
+                    if (match) {
+                        const [_, filePath, symbolName, line, character] = match
+                        
+                        // Send message to VS Code to navigate to this location
+                        vscode.postMessage({
+                            command: 'navigate',
+                            filePath,
+                            line: parseInt(line),
+                            character: parseInt(character),
+                            symbolName
+                        })
+                    }
+                })
+            })
+        }
+
         ;(async function () {
             const vscode = acquireVsCodeApi()
             // Inject dot file uri: $DOT_FILE_URI
@@ -41,6 +86,9 @@
                 .renderDot(dot, () => {
                     d3.select(window).on('resize.updatesvg', updateSvgViewBox)
                     updateSvgViewBox()
+                    
+                    // Make elements clickable after rendering
+                    makeElementsClickable()
                 })
             d3.select('#downloadSvg').on('click', () => {
                 gv.resetZoom()

@@ -26,6 +26,17 @@ const getHtmlContent = (staticDir: string, dotFileUri: string) => {
         .split('$DOT_FILE_URI')
         .join(dotFileUri)
 }
+
+interface WebviewMsg {
+    command: string
+    type?: 'dot' | 'svg'
+    data?: string
+    filePath?: string
+    line?: number
+    character?: number
+    symbolName?: string
+}
+
 const generateGraph = (
     type: 'Incoming' | 'Outgoing',
     callNodeFunction: (
@@ -69,7 +80,6 @@ const generateGraph = (
         if (ignoreFile && !fs.existsSync(ignoreFile)) ignoreFile = null
         const graph = await callNodeFunction(entry[0], item => {
             if (ignoreFile === null) return false
-            // working in the current workspace
             if (!item.uri.fsPath.startsWith(workspace.fsPath)) return true
             const ig = ignore().add(fs.readFileSync(ignoreFile).toString())
             const itemPath = item.uri.path.replace(`${workspace.path}/`, '')
@@ -93,12 +103,6 @@ const generateGraph = (
         panel.webview.html = getHtmlContent(staticDir, dotFileUri)
         panel.webview.onDidReceiveMessage(onReceiveMsg)
     }
-}
-
-interface WebviewMsg {
-    command: string
-    type: 'dot' | 'svg'
-    data: string
 }
 
 const registerWebviewPanelSerializer = (
@@ -139,13 +143,43 @@ export function activate(context: vscode.ExtensionContext) {
     const dotFileIncoming = vscode.Uri.file(
         path.resolve(staticDir, 'graph_data_incoming.dot'),
     )
+    
     const onReceiveMsgFactory =
         (type: 'Incoming' | 'Outgoing') => (msg: WebviewMsg) => {
             const savedName =
                 type === 'Incoming'
                     ? 'call_graph_incoming'
                     : 'call_graph_outgoing'
-            if (msg.command === 'download') {
+                    
+            if (msg.command === 'navigate' && msg.filePath && msg.line !== undefined && msg.character !== undefined) {
+                const fileUri = vscode.Uri.file(msg.filePath)
+                const position = new vscode.Position(msg.line, msg.character)
+                const selection = new vscode.Selection(position, position)
+                vscode.window.showTextDocument(fileUri, {
+                    selection: selection,
+                    viewColumn: vscode.ViewColumn.One
+                }).then(editor => {
+                    if (msg.symbolName) {
+                        const text = editor.document.getText()
+                        const symbolPos = editor.document.positionAt(
+                            text.indexOf(msg.symbolName, editor.document.offsetAt(position))
+                        )
+                        const decorationType = vscode.window.createTextEditorDecorationType({
+                            backgroundColor: 'rgba(66, 133, 244, 0.3)',
+                            border: '1px solid rgba(66, 133, 244, 0.7)'
+                        })
+                        editor.setDecorations(decorationType, [
+                            new vscode.Range(symbolPos, symbolPos.translate(0, msg.symbolName.length))
+                        ])
+                        setTimeout(() => {
+                            decorationType.dispose()
+                        }, 2000)
+                    }
+                })
+                vscode.window.setStatusBarMessage(`Navigated to ${msg.symbolName || 'definition'}`, 3000)
+            }
+            
+            if (msg.command === 'download' && msg.type && msg.data) {
                 const onDowload = async (fileType: 'dot' | 'svg') => {
                     const f = await vscode.window.showSaveDialog({
                         filters:
