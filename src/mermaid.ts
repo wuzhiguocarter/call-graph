@@ -24,6 +24,9 @@ export function generateMermaid(graph: CallHierarchyNode, path: string) {
     const workspaceRoot =
         vscode.workspace.workspaceFolders?.[0].uri.fsPath || ''
 
+    // Store file paths and line numbers for click events
+    const participantMetadata = new Map<string, { filePath: string; line: number; character: number }>()
+
     // Sets to track visited nodes and detect cycles
     const visited = new Set<string>()
 
@@ -45,6 +48,7 @@ export function generateMermaid(graph: CallHierarchyNode, path: string) {
         graph,
         callGraph,
         participants,
+        participantMetadata,
         workspaceRoot,
         visited,
         orderedCalls,
@@ -54,10 +58,21 @@ export function generateMermaid(graph: CallHierarchyNode, path: string) {
     // 添加参与者到图表（使用相对路径）
     participants.forEach((displayName, filePath) => {
         mermaid.addParticipant(filePath, displayName)
+        
+        // Add click event for the participant if metadata exists
+        if (participantMetadata.has(filePath)) {
+            const metadata = participantMetadata.get(filePath)!
+            mermaid.addClickEvent(
+                displayName,
+                metadata.filePath,
+                metadata.line,
+                metadata.character
+            )
+        }
     })
 
     // Use the ordered calls instead of topological sort
-    // 生成Mermaid调用序列
+    // 生成Mermaid调用��列
     orderedCalls.forEach(([callerPath, calleePath, callLabel]) => {
         const signature = `${callerPath}->${calleePath}:${callLabel}`
         if (!callSignatures.has(signature)) {
@@ -87,6 +102,7 @@ function traverseForCallGraph(
     node: CallHierarchyNode,
     callGraph: Map<string, Set<string>>,
     participants: Map<string, string>,
+    participantMetadata: Map<string, { filePath: string; line: number; character: number }>,
     workspaceRoot: string,
     visited: Set<string> = new Set(),
     orderedCalls: Array<[string, string, string]> = [],
@@ -105,6 +121,13 @@ function traverseForCallGraph(
             '#' +
             crypto.randomBytes(2).toString('hex')
         participants.set(callerPath, callerShortName)
+        
+        // Store metadata for click event
+        participantMetadata.set(callerPath, {
+            filePath: node.item.uri.toString(),
+            line: node.item.range.start.line,
+            character: node.item.range.start.character
+        })
     }
 
     // Sort children by source position before processing
@@ -164,6 +187,13 @@ function traverseForCallGraph(
                 '#' +
                 crypto.randomBytes(2).toString('hex')
             participants.set(calleePath, calleeShortName)
+            
+            // Store metadata for click event
+            participantMetadata.set(calleePath, {
+                filePath: child.item.uri.toString(),
+                line: child.item.range.start.line,
+                character: child.item.range.start.character
+            })
         }
 
         // 添加调用关系到图
@@ -185,6 +215,7 @@ function traverseForCallGraph(
                 child,
                 callGraph,
                 participants,
+                participantMetadata,
                 workspaceRoot,
                 visited,
                 orderedCalls,
@@ -201,6 +232,7 @@ class MermaidSequenceDiagram {
     private _content = ''
     private _participants: string[] = []
     private _calls: string[] = []
+    private _clicks: string[] = []
     private _participantIds: Map<string, string> = new Map()
     private _idCounter = 0
 
@@ -234,11 +266,26 @@ class MermaidSequenceDiagram {
         const safeId = this.getSafeId(shortName)
 
         // Escape any special characters in the shortName
-        const safeShortName = shortName.replace(/["\\]/g, '\\$&').slice(0, -5)
+        const safeShortName = shortName.replace(/[\"\\]/g, '\\$&').slice(0, -5)
 
         // Use just the shortName as the display name - it's already more readable
         // in the getUniqueShortName function
         this._participants.push(`    participant ${safeId} as ${safeShortName}`)
+    }
+
+    /**
+     * Add a click event to a participant
+     * @param participantName The name of the participant to add the click event to
+     * @param filePath The file path to navigate to
+     * @param line The line number to navigate to
+     * @param character The character position to navigate to
+     */
+    addClickEvent(participantName: string, filePath: string, line: number, character: number) {
+        const safeId = this.getSafeId(participantName)
+        
+        // Create a callback that will be handled by the webview
+        // The callback includes the file URI, line, and character position
+        this._clicks.push(`    click ${safeId} callback "navigate:${filePath}:${line}:${character}"`)
     }
 
     /**
@@ -253,7 +300,7 @@ class MermaidSequenceDiagram {
         const safeTo = this.getSafeId(to)
 
         // Escape any special characters in the label
-        const safeLabel = label.replace(/["\\]/g, '\\$&')
+        const safeLabel = label.replace(/[\"\\]/g, '\\$&')
 
         this._calls.push(`    ${safeFrom}->>+${safeTo}: ${safeLabel}`)
     }
@@ -270,7 +317,7 @@ class MermaidSequenceDiagram {
         const safeTo = this.getSafeId(to)
 
         // Escape any special characters in the label
-        const safeLabel = label.replace(/["\\]/g, '\\$&')
+        const safeLabel = label.replace(/[\"\\]/g, '\\$&')
 
         // Use simple arrow without activation
         this._calls.push(`    ${safeFrom}->>${safeTo}: ${safeLabel}`)
@@ -288,7 +335,7 @@ class MermaidSequenceDiagram {
         const safeTo = this.getSafeId(to)
 
         // Escape any special characters in the label
-        const safeLabel = label.replace(/["\\]/g, '\\$&')
+        const safeLabel = label.replace(/[\"\\]/g, '\\$&')
 
         this._calls.push(`    ${safeFrom}-->>-${safeTo}: ${safeLabel}`)
     }
@@ -305,7 +352,7 @@ class MermaidSequenceDiagram {
         const safeTo = this.getSafeId(to)
 
         // Escape any special characters in the label
-        const safeLabel = label.replace(/["\\]/g, '\\$&')
+        const safeLabel = label.replace(/[\"\\]/g, '\\$&')
 
         // Use dashed arrow without deactivation
         this._calls.push(`    ${safeFrom}-->>${safeTo}: ${safeLabel}`)
@@ -315,12 +362,14 @@ class MermaidSequenceDiagram {
      * Convert the diagram to a string
      */
     toString(): string {
-        // Combine all participants and calls
+        // Combine all participants, calls, and click events
         return (
             this._content +
             this._participants.join('\n') +
             '\n' +
             this._calls.join('\n') +
+            '\n' +
+            this._clicks.join('\n') +
             '\n'
         )
     }

@@ -116,10 +116,13 @@ const generateDiagram = (
 
 interface WebviewMsg {
     command: string
-    type: 'dot' | 'svg'
-    data: string
+    type?: 'dot' | 'svg'
+    data?: string
     filename?: string
     contentType?: string
+    uri?: string
+    line?: number
+    character?: number
 }
 
 const registerWebviewPanelSerializer = (
@@ -180,7 +183,23 @@ export function activate(context: vscode.ExtensionContext) {
                     : diagramType === 'Graph'
                       ? 'call_graph_outgoing'
                       : 'sequence_diagram_outgoing'
-            if (msg.command === 'download') {
+            
+            if (msg.command === 'navigate' && msg.uri && msg.line !== undefined && msg.character !== undefined) {
+                // Handle navigation to source code
+                const uri = vscode.Uri.parse(msg.uri)
+                const position = new vscode.Position(msg.line, msg.character)
+                
+                // Open the file and reveal the position
+                vscode.workspace.openTextDocument(uri).then(document => {
+                    vscode.window.showTextDocument(document, {
+                        selection: new vscode.Range(position, position),
+                        viewColumn: vscode.ViewColumn.One, // Open in the first column
+                    })
+                }).catch(error => {
+                    vscode.window.showErrorMessage(`Failed to open file: ${error.message}`)
+                    output.appendLine(`Navigation error: ${error.message}`)
+                })
+            } else if (msg.command === 'download') {
                 const onDowload = async (fileType: 'dot' | 'svg') => {
                     const f = await vscode.window.showSaveDialog({
                         filters:
@@ -193,12 +212,12 @@ export function activate(context: vscode.ExtensionContext) {
                         ),
                     })
                     if (!f) return
-                    fs.writeFileSync(f.fsPath, msg.data)
+                    fs.writeFileSync(f.fsPath, msg.data!)
                     vscode.window.showInformationMessage(
                         'Call Graph file saved: ' + f.fsPath,
                     )
                 }
-                onDowload(msg.type)
+                onDowload(msg.type!)
             } else if (msg.command === 'exportFile') {
                 // Handle the exportFile command from sequence.html
                 const handleExport = async () => {
@@ -226,7 +245,7 @@ export function activate(context: vscode.ExtensionContext) {
 
                         if (!f) return
 
-                        fs.writeFileSync(f.fsPath, msg.data)
+                        fs.writeFileSync(f.fsPath, msg.data!)
                         vscode.window.showInformationMessage(
                             'File saved: ' + f.fsPath,
                         )
