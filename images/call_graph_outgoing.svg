@@ -1,0 +1,243 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="831.5" height="474" viewBox="0 0 831.5 474">
+<g id="graph0" class="graph" transform="translate(4,470) scale(1)">
+<polygon fill="white" stroke="none" points="-4,4 -4,-470 827.5,-470 827.5,4 -4,4"/>
+<g id="clust17" class="cluster">
+<title>cluster_/Users/didi/projects/windsurf-projects/call-graph/src/extension.ts</title>
+<polygon fill="none" stroke="black" points="8,-261 8,-458 458.1,-458 458.1,-261 8,-261"/>
+<text text-anchor="middle" x="233.05" y="-441.4" font-family="Times,serif" font-size="14.00">${workspace}/src/extension.ts</text>
+</g>
+<g id="clust18" class="cluster">
+<title>cluster_/Users/didi/projects/windsurf-projects/call-graph/src/dot.ts</title>
+<polygon fill="none" stroke="black" points="346.79,-8 346.79,-253 815.5,-253 815.5,-8 346.79,-8"/>
+<text text-anchor="middle" x="581.14" y="-236.4" font-family="Times,serif" font-size="14.00">${workspace}/src/dot.ts</text>
+</g>
+<!-- /Users/didi/projects/windsurf&#45;projects/call&#45;graph/src/extension.ts#activate@125:0 -->
+<g id="node1" class="node">
+<title>/Users/didi/projects/windsurf-projects/call-graph/src/extension.ts#activate@125:0</title>
+<polygon fill="none" stroke="black" points="75.52,-365 16,-365 16,-329 75.52,-329 75.52,-365"/>
+<text text-anchor="middle" x="45.76" y="-342.8" font-family="Times,serif" font-size="14.00">activate</text>
+</g>
+<!-- /Users/didi/projects/windsurf&#45;projects/call&#45;graph/src/extension.ts#getDefaultProgressOptions@13:34 -->
+<g id="node2" class="node">
+<title>/Users/didi/projects/windsurf-projects/call-graph/src/extension.ts#getDefaultProgressOptions@13:34</title>
+<polygon fill="none" stroke="black" points="293.52,-305 125.88,-305 125.88,-269 293.52,-269 293.52,-305"/>
+<text text-anchor="middle" x="209.7" y="-282.8" font-family="Times,serif" font-size="14.00">getDefaultProgressOptions</text>
+</g>
+<!-- /Users/didi/projects/windsurf&#45;projects/call&#45;graph/src/extension.ts#activate@125:0&#45;&gt;/Users/didi/projects/windsurf&#45;projects/call&#45;graph/src/extension.ts#getDefaultProgressOptions@13:34 -->
+<g id="edge1" class="edge">
+<title>/Users/didi/projects/windsurf-projects/call-graph/src/extension.ts#activate@125:0-&gt;/Users/didi/projects/windsurf-projects/call-graph/src/extension.ts#getDefaultProgressOptions@13:34</title>
+<path fill="none" stroke="black" d="M73.86,-328.58C85.11,-321.61 98.55,-314.13 111.52,-309 112.65,-308.55 113.79,-308.12 114.93,-307.69"/>
+<polygon fill="black" stroke="black" points="115.75,-311.11 124.05,-304.53 113.45,-304.5 115.75,-311.11"/>
+</g>
+<!-- /Users/didi/projects/windsurf&#45;projects/call&#45;graph/src/extension.ts#generateGraph@28:22 -->
+<g id="node3" class="node">
+<title>/Users/didi/projects/windsurf-projects/call-graph/src/extension.ts#generateGraph@28:22</title>
+<polygon fill="none" stroke="black" points="258.9,-345 160.51,-345 160.51,-309 258.9,-309 258.9,-345"/>
+<text text-anchor="middle" x="209.7" y="-322.8" font-family="Times,serif" font-size="14.00">generateGraph</text>
+</g>
+<!-- /Users/didi/projects/windsurf&#45;projects/call&#45;graph/src/extension.ts#activate@125:0&#45;&gt;/Users/didi/projects/windsurf&#45;projects/call&#45;graph/src/extension.ts#generateGraph@28:22 -->
+<g id="edge2" class="edge">
+<title>/Users/didi/projects/windsurf-projects/call-graph/src/extension.ts#activate@125:0-&gt;/Users/didi/projects/windsurf-projects/call-graph/src/extension.ts#generateGraph@28:22</title>
+<path fill="none" stroke="black" d="M75.71,-343.42C96.07,-340.91 124.03,-337.46 149.06,-334.37"/>
+<polygon fill="black" stroke="black" points="149.32,-337.86 158.82,-333.16 148.46,-330.91 149.32,-337.86"/>
+</g>
+<!-- /Users/didi/projects/windsurf&#45;projects/call&#45;graph/src/extension.ts#onReceiveMsgFactory@142:8 -->
+<g id="node4" class="node">
+<title>/Users/didi/projects/windsurf-projects/call-graph/src/extension.ts#onReceiveMsgFactory@142:8</title>
+<polygon fill="none" stroke="black" points="281.08,-385 138.33,-385 138.33,-349 281.08,-349 281.08,-385"/>
+<text text-anchor="middle" x="209.7" y="-362.8" font-family="Times,serif" font-size="14.00">onReceiveMsgFactory</text>
+</g>
+<!-- /Users/didi/projects/windsurf&#45;projects/call&#45;graph/src/extension.ts#activate@125:0&#45;&gt;/Users/didi/projects/windsurf&#45;projects/call&#45;graph/src/extension.ts#onReceiveMsgFactory@142:8 -->
+<g id="edge3" class="edge">
+<title>/Users/didi/projects/windsurf-projects/call-graph/src/extension.ts#activate@125:0-&gt;/Users/didi/projects/windsurf-projects/call-graph/src/extension.ts#onReceiveMsgFactory@142:8</title>
+<path fill="none" stroke="black" d="M75.71,-350.58C90.1,-352.35 108.3,-354.6 126.57,-356.86"/>
+<polygon fill="black" stroke="black" points="126.06,-360.32 136.42,-358.07 126.92,-353.37 126.06,-360.32"/>
+</g>
+<!-- /Users/didi/projects/windsurf&#45;projects/call&#45;graph/src/extension.ts#registerWebviewPanelSerializer@103:39 -->
+<g id="node5" class="node">
+<title>/Users/didi/projects/windsurf-projects/call-graph/src/extension.ts#registerWebviewPanelSerializer@103:39</title>
+<polygon fill="none" stroke="black" points="307.88,-425 111.52,-425 111.52,-389 307.88,-389 307.88,-425"/>
+<text text-anchor="middle" x="209.7" y="-402.8" font-family="Times,serif" font-size="14.00">registerWebviewPanelSerializer</text>
+</g>
+<!-- /Users/didi/projects/windsurf&#45;projects/call&#45;graph/src/extension.ts#activate@125:0&#45;&gt;/Users/didi/projects/windsurf&#45;projects/call&#45;graph/src/extension.ts#registerWebviewPanelSerializer@103:39 -->
+<g id="edge4" class="edge">
+<title>/Users/didi/projects/windsurf-projects/call-graph/src/extension.ts#activate@125:0-&gt;/Users/didi/projects/windsurf-projects/call-graph/src/extension.ts#registerWebviewPanelSerializer@103:39</title>
+<path fill="none" stroke="black" d="M73.86,-365.42C83.27,-371.25 94.2,-377.43 110.74,-384.37"/>
+<polygon fill="black" stroke="black" points="109.17,-387.51 119.76,-387.98 111.78,-381.01 109.17,-387.51"/>
+</g>
+<!-- /Users/didi/projects/windsurf&#45;projects/call&#45;graph/src/dot.ts#generateDot@6:0 -->
+<g id="node6" class="node">
+<title>/Users/didi/projects/windsurf-projects/call-graph/src/dot.ts#generateDot@6:0</title>
+<polygon fill="none" stroke="black" points="439.19,-104 354.79,-104 354.79,-68 439.19,-68 439.19,-104"/>
+<text text-anchor="middle" x="396.99" y="-81.8" font-family="Times,serif" font-size="14.00">generateDot</text>
+</g>
+<!-- /Users/didi/projects/windsurf&#45;projects/call&#45;graph/src/extension.ts#generateGraph@28:22&#45;&gt;/Users/didi/projects/windsurf&#45;projects/call&#45;graph/src/dot.ts#generateDot@6:0 -->
+<g id="edge5" class="edge">
+<title>/Users/didi/projects/windsurf-projects/call-graph/src/extension.ts#generateGraph@28:22-&gt;/Users/didi/projects/windsurf-projects/call-graph/src/dot.ts#generateDot@6:0</title>
+<path fill="none" stroke="black" d="M259.31,-325.11C276.29,-322.26 294.45,-316.44 307.88,-305 337.9,-279.44 372.56,-168.62 387.93,-115.11"/>
+<polygon fill="black" stroke="black" points="391.22,-116.35 390.58,-105.78 384.49,-114.44 391.22,-116.35"/>
+</g>
+<!-- /Users/didi/projects/windsurf&#45;projects/call&#45;graph/src/extension.ts#getHtmlContent@21:23 -->
+<g id="node7" class="node">
+<title>/Users/didi/projects/windsurf-projects/call-graph/src/extension.ts#getHtmlContent@21:23</title>
+<polygon fill="none" stroke="black" points="450.1,-345 343.88,-345 343.88,-309 450.1,-309 450.1,-345"/>
+<text text-anchor="middle" x="396.99" y="-322.8" font-family="Times,serif" font-size="14.00">getHtmlContent</text>
+</g>
+<!-- /Users/didi/projects/windsurf&#45;projects/call&#45;graph/src/extension.ts#generateGraph@28:22&#45;&gt;/Users/didi/projects/windsurf&#45;projects/call&#45;graph/src/extension.ts#getHtmlContent@21:23 -->
+<g id="edge6" class="edge">
+<title>/Users/didi/projects/windsurf-projects/call-graph/src/extension.ts#generateGraph@28:22-&gt;/Users/didi/projects/windsurf-projects/call-graph/src/extension.ts#getHtmlContent@21:23</title>
+<path fill="none" stroke="black" d="M259.39,-327C281.59,-327 308.19,-327 331.98,-327"/>
+<polygon fill="black" stroke="black" points="331.9,-330.5 341.9,-327 331.9,-323.5 331.9,-330.5"/>
+</g>
+<!-- /Users/didi/projects/windsurf&#45;projects/call&#45;graph/src/extension.ts#onDowload@148:34 -->
+<g id="node17" class="node">
+<title>/Users/didi/projects/windsurf-projects/call-graph/src/extension.ts#onDowload@148:34</title>
+<polygon fill="none" stroke="black" points="437.65,-385 356.33,-385 356.33,-349 437.65,-349 437.65,-385"/>
+<text text-anchor="middle" x="396.99" y="-362.8" font-family="Times,serif" font-size="14.00">onDowload</text>
+</g>
+<!-- /Users/didi/projects/windsurf&#45;projects/call&#45;graph/src/extension.ts#onReceiveMsgFactory@142:8&#45;&gt;/Users/didi/projects/windsurf&#45;projects/call&#45;graph/src/extension.ts#onDowload@148:34 -->
+<g id="edge21" class="edge">
+<title>/Users/didi/projects/windsurf-projects/call-graph/src/extension.ts#onReceiveMsgFactory@142:8-&gt;/Users/didi/projects/windsurf-projects/call-graph/src/extension.ts#onDowload@148:34</title>
+<path fill="none" stroke="black" d="M281.55,-367C302.54,-367 325.12,-367 344.63,-367"/>
+<polygon fill="black" stroke="black" points="344.52,-370.5 354.52,-367 344.52,-363.5 344.52,-370.5"/>
+</g>
+<!-- /Users/didi/projects/windsurf&#45;projects/call&#45;graph/src/dot.ts#Graph@83:0 -->
+<g id="node8" class="node">
+<title>/Users/didi/projects/windsurf-projects/call-graph/src/dot.ts#Graph@83:0</title>
+<polygon fill="none" stroke="black" points="551.81,-52 497.81,-52 497.81,-16 551.81,-16 551.81,-52"/>
+<text text-anchor="middle" x="524.81" y="-29.8" font-family="Times,serif" font-size="14.00">Graph</text>
+</g>
+<!-- /Users/didi/projects/windsurf&#45;projects/call&#45;graph/src/dot.ts#generateDot@6:0&#45;&gt;/Users/didi/projects/windsurf&#45;projects/call&#45;graph/src/dot.ts#Graph@83:0 -->
+<g id="edge7" class="edge">
+<title>/Users/didi/projects/windsurf-projects/call-graph/src/dot.ts#generateDot@6:0-&gt;/Users/didi/projects/windsurf-projects/call-graph/src/dot.ts#Graph@83:0</title>
+<path fill="none" stroke="black" d="M439.54,-68.83C454.86,-62.5 472.1,-55.37 486.98,-49.22"/>
+<polygon fill="black" stroke="black" points="488.02,-52.58 495.93,-45.52 485.35,-46.11 488.02,-52.58"/>
+</g>
+<!-- /Users/didi/projects/windsurf&#45;projects/call&#45;graph/src/dot.ts#addAttr@93:4 -->
+<g id="node9" class="node">
+<title>/Users/didi/projects/windsurf-projects/call-graph/src/dot.ts#addAttr@93:4</title>
+<polygon fill="none" stroke="black" points="687.07,-55 628.3,-55 628.3,-19 687.07,-19 687.07,-55"/>
+<text text-anchor="middle" x="657.68" y="-32.8" font-family="Times,serif" font-size="14.00">addAttr</text>
+</g>
+<!-- /Users/didi/projects/windsurf&#45;projects/call&#45;graph/src/dot.ts#generateDot@6:0&#45;&gt;/Users/didi/projects/windsurf&#45;projects/call&#45;graph/src/dot.ts#addAttr@93:4 -->
+<g id="edge8" class="edge">
+<title>/Users/didi/projects/windsurf-projects/call-graph/src/dot.ts#generateDot@6:0-&gt;/Users/didi/projects/windsurf-projects/call-graph/src/dot.ts#addAttr@93:4</title>
+<path fill="none" stroke="black" d="M439.54,-75.45C454.2,-71.9 470.84,-68.07 486.1,-65 498.68,-62.47 570.57,-50.83 616.92,-43.37"/>
+<polygon fill="black" stroke="black" points="617.29,-46.86 626.61,-41.82 616.18,-39.95 617.29,-46.86"/>
+</g>
+<!-- /Users/didi/projects/windsurf&#45;projects/call&#45;graph/src/dot.ts#getNode@12:20 -->
+<g id="node10" class="node">
+<title>/Users/didi/projects/windsurf-projects/call-graph/src/dot.ts#getNode@12:20</title>
+<polygon fill="none" stroke="black" points="689.4,-95 625.97,-95 625.97,-59 689.4,-59 689.4,-95"/>
+<text text-anchor="middle" x="657.68" y="-72.8" font-family="Times,serif" font-size="14.00">getNode</text>
+</g>
+<!-- /Users/didi/projects/windsurf&#45;projects/call&#45;graph/src/dot.ts#generateDot@6:0&#45;&gt;/Users/didi/projects/windsurf&#45;projects/call&#45;graph/src/dot.ts#getNode@12:20 -->
+<g id="edge9" class="edge">
+<title>/Users/didi/projects/windsurf-projects/call-graph/src/dot.ts#generateDot@6:0-&gt;/Users/didi/projects/windsurf-projects/call-graph/src/dot.ts#getNode@12:20</title>
+<path fill="none" stroke="black" d="M439.41,-75.75C454.06,-72.6 470.72,-69.55 486.1,-68 529.71,-63.59 579.82,-67.27 614.39,-71.17"/>
+<polygon fill="black" stroke="black" points="613.64,-74.61 623.98,-72.31 614.47,-67.66 613.64,-74.61"/>
+</g>
+<!-- /Users/didi/projects/windsurf&#45;projects/call&#45;graph/src/dot.ts#insertNode@33:23 -->
+<g id="node11" class="node">
+<title>/Users/didi/projects/windsurf-projects/call-graph/src/dot.ts#insertNode@33:23</title>
+<polygon fill="none" stroke="black" points="563.53,-104 486.1,-104 486.1,-68 563.53,-68 563.53,-104"/>
+<text text-anchor="middle" x="524.81" y="-81.8" font-family="Times,serif" font-size="14.00">insertNode</text>
+</g>
+<!-- /Users/didi/projects/windsurf&#45;projects/call&#45;graph/src/dot.ts#generateDot@6:0&#45;&gt;/Users/didi/projects/windsurf&#45;projects/call&#45;graph/src/dot.ts#insertNode@33:23 -->
+<g id="edge10" class="edge">
+<title>/Users/didi/projects/windsurf-projects/call-graph/src/dot.ts#generateDot@6:0-&gt;/Users/didi/projects/windsurf-projects/call-graph/src/dot.ts#insertNode@33:23</title>
+<path fill="none" stroke="black" d="M439.54,-86C450.7,-86 462.89,-86 474.44,-86"/>
+<polygon fill="black" stroke="black" points="474.2,-89.5 484.2,-86 474.2,-82.5 474.2,-89.5"/>
+</g>
+<!-- /Users/didi/projects/windsurf&#45;projects/call&#45;graph/src/dot.ts#addNode@96:4 -->
+<g id="node12" class="node">
+<title>/Users/didi/projects/windsurf-projects/call-graph/src/dot.ts#addNode@96:4</title>
+<polygon fill="none" stroke="black" points="558.08,-162 491.54,-162 491.54,-126 558.08,-126 558.08,-162"/>
+<text text-anchor="middle" x="524.81" y="-139.8" font-family="Times,serif" font-size="14.00">addNode</text>
+</g>
+<!-- /Users/didi/projects/windsurf&#45;projects/call&#45;graph/src/dot.ts#generateDot@6:0&#45;&gt;/Users/didi/projects/windsurf&#45;projects/call&#45;graph/src/dot.ts#addNode@96:4 -->
+<g id="edge11" class="edge">
+<title>/Users/didi/projects/windsurf-projects/call-graph/src/dot.ts#generateDot@6:0-&gt;/Users/didi/projects/windsurf-projects/call-graph/src/dot.ts#addNode@96:4</title>
+<path fill="none" stroke="black" d="M437.8,-104.35C451.57,-110.7 467.05,-117.84 481.05,-124.29"/>
+<polygon fill="black" stroke="black" points="479.49,-127.42 490.04,-128.43 482.42,-121.06 479.49,-127.42"/>
+</g>
+<!-- /Users/didi/projects/windsurf&#45;projects/call&#45;graph/src/dot.ts#toString@167:4 -->
+<g id="node13" class="node">
+<title>/Users/didi/projects/windsurf-projects/call-graph/src/dot.ts#toString@167:4</title>
+<polygon fill="none" stroke="black" points="555.37,-220 494.25,-220 494.25,-184 555.37,-184 555.37,-220"/>
+<text text-anchor="middle" x="524.81" y="-197.8" font-family="Times,serif" font-size="14.00">toString</text>
+</g>
+<!-- /Users/didi/projects/windsurf&#45;projects/call&#45;graph/src/dot.ts#generateDot@6:0&#45;&gt;/Users/didi/projects/windsurf&#45;projects/call&#45;graph/src/dot.ts#toString@167:4 -->
+<g id="edge12" class="edge">
+<title>/Users/didi/projects/windsurf-projects/call-graph/src/dot.ts#generateDot@6:0-&gt;/Users/didi/projects/windsurf-projects/call-graph/src/dot.ts#toString@167:4</title>
+<path fill="none" stroke="black" d="M412.53,-104.47C427.63,-122.95 452.68,-151.76 485.15,-178.6"/>
+<polygon fill="black" stroke="black" points="482.86,-181.26 492.85,-184.79 487.25,-175.8 482.86,-181.26"/>
+</g>
+<!-- /Users/didi/projects/windsurf&#45;projects/call&#45;graph/src/dot.ts#getAttr@158:4 -->
+<g id="node14" class="node">
+<title>/Users/didi/projects/windsurf-projects/call-graph/src/dot.ts#getAttr@158:4</title>
+<polygon fill="none" stroke="black" points="807.5,-158 751.84,-158 751.84,-122 807.5,-122 807.5,-158"/>
+<text text-anchor="middle" x="779.67" y="-135.8" font-family="Times,serif" font-size="14.00">getAttr</text>
+</g>
+<!-- /Users/didi/projects/windsurf&#45;projects/call&#45;graph/src/dot.ts#addAttr@93:4&#45;&gt;/Users/didi/projects/windsurf&#45;projects/call&#45;graph/src/dot.ts#getAttr@158:4 -->
+<g id="edge13" class="edge">
+<title>/Users/didi/projects/windsurf-projects/call-graph/src/dot.ts#addAttr@93:4-&gt;/Users/didi/projects/windsurf-projects/call-graph/src/dot.ts#getAttr@158:4</title>
+<path fill="none" stroke="black" d="M687.28,-44.59C696.93,-48.01 707.39,-52.72 715.84,-59 734.95,-73.2 751.24,-94.67 762.44,-111.94"/>
+<polygon fill="black" stroke="black" points="759.37,-113.63 767.63,-120.25 765.3,-109.92 759.37,-113.63"/>
+</g>
+<!-- /Users/didi/projects/windsurf&#45;projects/call&#45;graph/src/dot.ts#insertNode@33:23&#45;&gt;/Users/didi/projects/windsurf&#45;projects/call&#45;graph/src/dot.ts#getNode@12:20 -->
+<g id="edge14" class="edge">
+<title>/Users/didi/projects/windsurf-projects/call-graph/src/dot.ts#insertNode@33:23-&gt;/Users/didi/projects/windsurf-projects/call-graph/src/dot.ts#getNode@12:20</title>
+<path fill="none" stroke="black" d="M564.02,-83.37C579.8,-82.29 598.16,-81.02 614.35,-79.91"/>
+<polygon fill="black" stroke="black" points="614.45,-83.41 624.18,-79.24 613.97,-76.43 614.45,-83.41"/>
+</g>
+<!-- /Users/didi/projects/windsurf&#45;projects/call&#45;graph/src/dot.ts#insertNode@33:23&#45;&gt;/Users/didi/projects/windsurf&#45;projects/call&#45;graph/src/dot.ts#insertNode@33:23 -->
+<g id="edge15" class="edge">
+<title>/Users/didi/projects/windsurf-projects/call-graph/src/dot.ts#insertNode@33:23-&gt;/Users/didi/projects/windsurf-projects/call-graph/src/dot.ts#insertNode@33:23</title>
+<path fill="none" stroke="black" d="M504.22,-104.37C507.96,-106.57 514.83,-108 524.81,-108 528.4,-108 531.59,-107.82 534.37,-107.48"/>
+<polygon fill="black" stroke="black" points="535.27,-110.86 543.95,-104.78 533.38,-104.12 535.27,-110.86"/>
+</g>
+<!-- /Users/didi/projects/windsurf&#45;projects/call&#45;graph/src/dot.ts#isNodeEqual@56:0 -->
+<g id="node15" class="node">
+<title>/Users/didi/projects/windsurf-projects/call-graph/src/dot.ts#isNodeEqual@56:0</title>
+<polygon fill="none" stroke="black" points="701.84,-135 613.53,-135 613.53,-99 701.84,-99 701.84,-135"/>
+<text text-anchor="middle" x="657.68" y="-112.8" font-family="Times,serif" font-size="14.00">isNodeEqual</text>
+</g>
+<!-- /Users/didi/projects/windsurf&#45;projects/call&#45;graph/src/dot.ts#insertNode@33:23&#45;&gt;/Users/didi/projects/windsurf&#45;projects/call&#45;graph/src/dot.ts#isNodeEqual@56:0 -->
+<g id="edge16" class="edge">
+<title>/Users/didi/projects/windsurf-projects/call-graph/src/dot.ts#insertNode@33:23-&gt;/Users/didi/projects/windsurf-projects/call-graph/src/dot.ts#isNodeEqual@56:0</title>
+<path fill="none" stroke="black" d="M564.02,-95.05C575.92,-97.87 589.29,-101.04 602.09,-104.07"/>
+<polygon fill="black" stroke="black" points="601.13,-107.44 611.66,-106.34 602.74,-100.63 601.13,-107.44"/>
+</g>
+<!-- /Users/didi/projects/windsurf&#45;projects/call&#45;graph/src/dot.ts#addNode@96:4&#45;&gt;/Users/didi/projects/windsurf&#45;projects/call&#45;graph/src/dot.ts#addNode@96:4 -->
+<g id="edge17" class="edge">
+<title>/Users/didi/projects/windsurf-projects/call-graph/src/dot.ts#addNode@96:4-&gt;/Users/didi/projects/windsurf-projects/call-graph/src/dot.ts#addNode@96:4</title>
+<path fill="none" stroke="black" d="M504.22,-162.37C507.96,-164.57 514.83,-166 524.81,-166 528.4,-166 531.59,-165.82 534.37,-165.48"/>
+<polygon fill="black" stroke="black" points="535.27,-168.86 543.95,-162.78 533.38,-162.12 535.27,-168.86"/>
+</g>
+<!-- /Users/didi/projects/windsurf&#45;projects/call&#45;graph/src/dot.ts#addNode@96:4&#45;&gt;/Users/didi/projects/windsurf&#45;projects/call&#45;graph/src/dot.ts#getAttr@158:4 -->
+<g id="edge18" class="edge">
+<title>/Users/didi/projects/windsurf-projects/call-graph/src/dot.ts#addNode@96:4-&gt;/Users/didi/projects/windsurf-projects/call-graph/src/dot.ts#getAttr@158:4</title>
+<path fill="none" stroke="black" d="M558.35,-143.49C605.03,-142.75 690.82,-141.39 740.46,-140.6"/>
+<polygon fill="black" stroke="black" points="740.2,-144.11 750.14,-140.45 740.09,-137.11 740.2,-144.11"/>
+</g>
+<!-- /Users/didi/projects/windsurf&#45;projects/call&#45;graph/src/dot.ts#insertToSubgraph@147:4 -->
+<g id="node16" class="node">
+<title>/Users/didi/projects/windsurf-projects/call-graph/src/dot.ts#insertToSubgraph@147:4</title>
+<polygon fill="none" stroke="black" points="715.84,-181 599.53,-181 599.53,-145 715.84,-145 715.84,-181"/>
+<text text-anchor="middle" x="657.68" y="-158.8" font-family="Times,serif" font-size="14.00">insertToSubgraph</text>
+</g>
+<!-- /Users/didi/projects/windsurf&#45;projects/call&#45;graph/src/dot.ts#addNode@96:4&#45;&gt;/Users/didi/projects/windsurf&#45;projects/call&#45;graph/src/dot.ts#insertToSubgraph@147:4 -->
+<g id="edge19" class="edge">
+<title>/Users/didi/projects/windsurf-projects/call-graph/src/dot.ts#addNode@96:4-&gt;/Users/didi/projects/windsurf-projects/call-graph/src/dot.ts#insertToSubgraph@147:4</title>
+<path fill="none" stroke="black" d="M558.5,-148.75C567.56,-150.06 577.75,-151.54 588.05,-153.04"/>
+<polygon fill="black" stroke="black" points="587.32,-156.47 597.72,-154.44 588.33,-149.54 587.32,-156.47"/>
+</g>
+<!-- /Users/didi/projects/windsurf&#45;projects/call&#45;graph/src/dot.ts#insertToSubgraph@147:4&#45;&gt;/Users/didi/projects/windsurf&#45;projects/call&#45;graph/src/dot.ts#getAttr@158:4 -->
+<g id="edge20" class="edge">
+<title>/Users/didi/projects/windsurf-projects/call-graph/src/dot.ts#insertToSubgraph@147:4-&gt;/Users/didi/projects/windsurf-projects/call-graph/src/dot.ts#getAttr@158:4</title>
+<path fill="none" stroke="black" d="M716.22,-151.97C724.36,-150.41 732.57,-148.84 740.24,-147.37"/>
+<polygon fill="black" stroke="black" points="740.73,-150.84 749.89,-145.52 739.41,-143.96 740.73,-150.84"/>
+</g>
+</g>
+</svg>

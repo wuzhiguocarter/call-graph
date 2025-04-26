@@ -1,0 +1,417 @@
+<!doctype html>
+<html lang="zh-CN">
+    <head>
+        <meta charset="UTF-8" />
+        <title>Mermaid 图表查看器</title>
+        <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+        <style>
+            :root {
+                --bg-color: #ffffff;
+                --text-color: #333333;
+            }
+            body {
+                margin: 0;
+                padding: 20px;
+                background-color: var(--bg-color);
+                color: var(--text-color);
+                overflow: hidden;
+            }
+            .toolbar {
+                margin-bottom: 20px;
+                display: flex;
+                gap: 10px;
+                flex-wrap: wrap;
+            }
+            button {
+                padding: 8px 15px;
+                background: #409eff;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                cursor: pointer;
+                transition: opacity 0.3s;
+            }
+            button:hover {
+                opacity: 0.8;
+            }
+            #chart-container {
+                border: 1px solid #eee;
+                padding: 20px;
+                border-radius: 4px;
+                overflow: auto;
+                height: 80vh;
+                display: flex;
+                /* justify-content: center; */
+            }
+            .error {
+                color: #f56c6c;
+                padding: 10px;
+                border: 1px solid currentColor;
+                border-radius: 4px;
+                margin-top: 10px;
+            }
+            .clickable-participant {
+                cursor: pointer;
+            }
+            .tooltip {
+                position: absolute;
+                background: rgba(0, 0, 0, 0.8);
+                color: white;
+                padding: 5px 10px;
+                border-radius: 4px;
+                font-size: 12px;
+                pointer-events: none;
+                z-index: 1000;
+                display: none;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="toolbar">
+            <button onclick="zoomIn()">放大</button>
+            <button onclick="zoomOut()">缩小</button>
+            <button onclick="resetView()">最佳视野</button>
+            <button onclick="exportSVG()">导出SVG</button>
+            <button onclick="downloadMMD()">下载源码</button>
+        </div>
+        <div id="chart-container"></div>
+        <div id="tooltip" class="tooltip"></div>
+
+        <script>
+            const vscode = acquireVsCodeApi()
+            vscode.setState('$MERMAID_FILE_URI')
+
+            function initMermaid() {
+                const style = getComputedStyle(document.body)
+                mermaid.initialize({
+                    startOnLoad: false,
+                    theme: 'base',
+                    themeVariables: {
+                        background: style.getPropertyValue('--bg-color').trim(),
+                        primaryColor: '#409eff',
+                        textColor: style
+                            .getPropertyValue('--text-color')
+                            .trim(),
+                        actorBkg: '#e4f7fb',
+                        actorBorder: '#409eff',
+                        participantBkg: '#e4f7fb',
+                        participantBorder: '#409eff',
+                        actorFontSize: '14px',
+                        participantFontSize: '14px',
+                        boxMargin: '5px',
+                        noteMargin: '5px',
+                    },
+                    securityLevel: 'loose',
+                    sequence: {
+                        actorMargin: 50,
+                        messageMargin: 35
+                    },
+                    flowchart: {
+                        htmlLabels: true
+                    }
+                })
+            }
+
+            function renderMermaid() {
+                const container = document.getElementById('chart-container')
+                container.innerHTML = '<div class="loading">加载中...</div>'
+
+                fetch(vscode.getState() || 'example.mmd')
+                    .then(response => response.text())
+                    .then(text => {
+                        container.innerHTML = text
+                        mermaid.init(undefined, container, () => {
+                            container.querySelector('.loading')?.remove()
+                            const svg = container.querySelector('svg')
+                            if (svg) {
+                                initPanZoom(svg)
+                                setupClickHandlers(svg)
+                                resetView()
+                            }
+                        })
+                    })
+                    .catch(showError)
+            }
+
+            function setupClickHandlers(svg) {
+                const clickableElements = svg.querySelectorAll('[data-callback]')
+                
+                clickableElements.forEach(element => {
+                    const callback = element.getAttribute('data-callback')
+                    
+                    if (callback && callback.startsWith('navigate:')) {
+                        element.classList.add('clickable-participant')
+                        
+                        const [_, uri, line, character] = callback.split(':')
+                        
+                        element.addEventListener('mouseover', (e) => {
+                            showTooltip(e, `Click to navigate to source (${uri.split('/').pop()})`)
+                        })
+                        
+                        element.addEventListener('mouseout', () => {
+                            hideTooltip()
+                        })
+                        
+                        element.addEventListener('click', () => {
+                            navigateToSource(uri, parseInt(line), parseInt(character))
+                        })
+                    }
+                })
+            }
+
+            function showTooltip(event, text) {
+                const tooltip = document.getElementById('tooltip')
+                tooltip.textContent = text
+                tooltip.style.display = 'block'
+                tooltip.style.left = (event.pageX + 10) + 'px'
+                tooltip.style.top = (event.pageY + 10) + 'px'
+            }
+
+            function hideTooltip() {
+                document.getElementById('tooltip').style.display = 'none'
+            }
+
+            function navigateToSource(uri, line, character) {
+                vscode.postMessage({
+                    command: 'navigate',
+                    uri: uri,
+                    line: line,
+                    character: character
+                })
+            }
+
+            let scale = 1
+            let isPanning = false
+            let startPoint = { x: 0, y: 0 }
+            let viewBox = { x: 0, y: 0, w: 0, h: 0 }
+
+            function initPanZoom(svg) {
+                viewBox = svg.viewBox.baseVal
+
+                svg.addEventListener('wheel', handleMouseWheel)
+                svg.addEventListener('mousedown', startDragging)
+                svg.addEventListener('mousemove', whileDragging)
+                svg.addEventListener('mouseup', endDragging)
+                svg.addEventListener('mouseleave', endDragging)
+            }
+
+            function handleMouseWheel(e) {
+                e.preventDefault()
+                const zoomIntensity = 0.1
+                const rect = e.target.getBoundingClientRect()
+                const mouseX = e.clientX - rect.left
+                const mouseY = e.clientY - rect.top
+
+                const dw = viewBox.w * zoomIntensity * (e.deltaY < 0 ? -1 : 1)
+                scale = e.deltaY < 0 ? scale * 1.1 : scale * 0.9
+
+                viewBox.x += dw * (mouseX / rect.width)
+                viewBox.y += dw * (mouseY / rect.height)
+                viewBox.w -= dw
+                viewBox.h -= dw
+
+                updateSVGViewBox()
+            }
+
+            function startDragging(e) {
+                if (e.button === 0) {
+                    isPanning = true
+                    startPoint = { x: e.clientX, y: e.clientY }
+                    e.target.style.cursor = 'grabbing'
+                }
+            }
+
+            function whileDragging(e) {
+                if (isPanning) {
+                    const dx =
+                        (e.clientX - startPoint.x) *
+                        (viewBox.w / e.target.clientWidth)
+                    const dy =
+                        (e.clientY - startPoint.y) *
+                        (viewBox.h / e.target.clientHeight)
+
+                    viewBox.x -= dx
+                    viewBox.y -= dy
+                    updateSVGViewBox()
+
+                    startPoint = { x: e.clientX, y: e.clientY }
+                }
+            }
+
+            function endDragging(e) {
+                isPanning = false
+                e.target.style.cursor = 'grab'
+            }
+
+            function updateSVGViewBox() {
+                const svg = document.querySelector('#chart-container svg')
+                svg &&
+                    svg.setAttribute(
+                        'viewBox',
+                        `${viewBox.x} ${viewBox.y} ${viewBox.w} ${viewBox.h}`,
+                    )
+            }
+
+            function zoomIn() {
+                scale *= 1.1
+                viewBox.w /= 1.1
+                viewBox.h /= 1.1
+                updateSVGViewBox()
+            }
+
+            function zoomOut() {
+                scale *= 0.9
+                viewBox.w /= 0.9
+                viewBox.h /= 0.9
+                updateSVGViewBox()
+            }
+
+            function resetView() {
+                const svg = document.querySelector('#chart-container svg')
+                if (svg) {
+                    const allElements = svg.querySelectorAll('*')
+                    let minX = Infinity,
+                        minY = Infinity,
+                        maxX = 0,
+                        maxY = 0
+
+                    allElements.forEach(el => {
+                        try {
+                            if (el.getBBox) {
+                                const bbox = el.getBBox()
+                                minX = Math.min(minX, bbox.x)
+                                minY = Math.min(minY, bbox.y)
+                                maxX = Math.max(maxX, bbox.x + bbox.width)
+                                maxY = Math.max(maxY, bbox.y + bbox.height)
+                            }
+                        } catch (e) {
+                        }
+                    })
+
+                    if (
+                        minX === Infinity ||
+                        minY === Infinity ||
+                        maxX === 0 ||
+                        maxY === 0
+                    ) {
+                        viewBox.x = 0
+                        viewBox.y = 0
+                        viewBox.w = svg.width.baseVal.value || 1200
+                        viewBox.h = svg.height.baseVal.value || 800
+                    } else {
+                        const padding = 50
+                        viewBox.x = minX - padding
+                        viewBox.y = minY - padding
+                        viewBox.w = maxX - minX + padding * 2
+                        viewBox.h = maxY - minY + padding * 2
+                    }
+
+                    svg.setAttribute(
+                        'viewBox',
+                        `${viewBox.x} ${viewBox.y} ${viewBox.w} ${viewBox.h}`,
+                    )
+                    scale = 1
+                }
+            }
+
+            function exportSVG() {
+                const svg = document.querySelector('#chart-container svg')
+                if (!svg) {
+                    showError(new Error('没有找到可导出的图表'))
+                    return
+                }
+
+                try {
+                    const clonedSvg = svg.cloneNode(true)
+
+                    if (
+                        !clonedSvg.getAttribute('width') ||
+                        !clonedSvg.getAttribute('height')
+                    ) {
+                        const bbox = svg.getBBox()
+                        clonedSvg.setAttribute('width', bbox.width)
+                        clonedSvg.setAttribute('height', bbox.height)
+                    }
+
+                    const serializer = new XMLSerializer()
+                    const source = serializer.serializeToString(clonedSvg)
+
+                    vscode.postMessage({
+                        command: 'exportFile',
+                        data: source,
+                        filename: `diagram-${Date.now()}.svg`,
+                        contentType: 'image/svg+xml',
+                    })
+                } catch (error) {
+                    showError(error)
+                    console.error('Export SVG error:', error)
+                }
+            }
+
+            function downloadMMD() {
+                try {
+                    const fileUri = vscode.getState()
+                    if (!fileUri) {
+                        showError(new Error('无法获取文件URI'))
+                        return
+                    }
+
+                    const fileName = fileUri.split('/').pop() || 'diagram.mmd'
+
+                    fetch(fileUri)
+                        .then(response => {
+                            if (!response.ok) {
+                                throw new Error(
+                                    `HTTP error! Status: ${response.status}`,
+                                )
+                            }
+                            return response.text()
+                        })
+                        .then(text => {
+                            vscode.postMessage({
+                                command: 'exportFile',
+                                data: text,
+                                filename: fileName,
+                                contentType: 'text/plain',
+                            })
+                        })
+                        .catch(error => {
+                            showError(error)
+                            console.error('Download MMD error:', error)
+                        })
+                } catch (error) {
+                    showError(error)
+                    console.error('Download MMD error:', error)
+                }
+            }
+
+            function showError(error) {
+                const errorDiv = document.createElement('div')
+                errorDiv.className = 'error'
+                errorDiv.textContent = `加载失败: ${error.message}`
+                document.body.appendChild(errorDiv)
+            }
+
+            function handleWindowResize() {
+                const svg = document.querySelector('#chart-container svg')
+                if (svg) {
+                    svg.setAttribute('width', '100%')
+                    svg.setAttribute('height', '100%')
+                    svg.style.minWidth = '90%'
+                    svg.style.maxWidth = '100%'
+
+                    if (scale !== 1) {
+                        updateSVGViewBox()
+                    } else {
+                        resetView()
+                    }
+                }
+            }
+
+            window.addEventListener('resize', handleWindowResize)
+
+            initMermaid()
+            renderMermaid()
+        </script>
+    </body>
+</html>

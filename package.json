@@ -1,9 +1,9 @@
 {
-    "name": "call-graph",
-    "displayName": "Call Graph",
-    "description": "call graph for vscode",
-    "version": "1.2.3",
-    "publisher": "LuoZhihao",
+    "name": "callviz",
+    "displayName": "callviz",
+    "description": "Callgraph Visualization for vscode",
+    "version": "1.2.9",
+    "publisher": "WuZhiguo",
     "engines": {
         "vscode": "^1.65.0"
     },
@@ -14,8 +14,12 @@
     "activationEvents": [
         "onCommand:CallGraph.showOutgoingCallGraph",
         "onCommand:CallGraph.showIncomingCallGraph",
-        "onWebviewPanel:CallGraph.previewIncoming",
-        "onWebviewPanel:CallGraph.previewOutgoing"
+        "onCommand:CallGraph.showOutgoingSequenceDiagram",
+        "onCommand:CallGraph.showIncomingSequenceDiagram",
+        "onWebviewPanel:CallGraph.previewGraphIncoming",
+        "onWebviewPanel:CallGraph.previewGraphOutgoing",
+        "onWebviewPanel:CallGraph.previewSequenceIncoming",
+        "onWebviewPanel:CallGraph.previewSequenceOutgoing"
     ],
     "main": "./out/extension.js",
     "contributes": {
@@ -27,6 +31,14 @@
             {
                 "command": "CallGraph.showIncomingCallGraph",
                 "title": "CallGraph: Show incoming call graph"
+            },
+            {
+                "command": "CallGraph.showOutgoingSequenceDiagram",
+                "title": "CallGraph: Show outgoing sequence diagram"
+            },
+            {
+                "command": "CallGraph.showIncomingSequenceDiagram",
+                "title": "CallGraph: Show incoming sequence diagram"
             }
         ],
         "menus": {
@@ -36,6 +48,12 @@
                 },
                 {
                     "command": "CallGraph.showIncomingCallGraph"
+                },
+                {
+                    "command": "CallGraph.showOutgoingSequenceDiagram"
+                },
+                {
+                    "command": "CallGraph.showIncomingSequenceDiagram"
                 }
             ]
         },
@@ -51,6 +69,11 @@
                     "type": "number",
                     "default": 0,
                     "description": "the graph max depth. Set to 0 for unlimited depth"
+                },
+                "call-graph.inDegreeThreshold": {
+                    "type": "number",
+                    "default": 5,
+                    "description": "filter nodes with in-degree greater than this threshold. Set to 5 to disable filtering"
                 }
             }
         }
@@ -94,14 +117,14 @@
     },
     "repository": {
         "type": "git",
-        "url": "https://github.com/beicause/call-graph.git"
+        "url": "https://github.com/wuzhiguocarter/call-graph.git"
     },
     "license": "Apache",
     "icon": "images/icon.webp",
     "bugs": {
-        "url": "https://github.com/beicause/call-graph/issues"
+        "url": "https://github.com/wuzhiguocarter/call-graph/issues"
     },
-    "homepage": "https://github.com/beicause/call-graph/blob/master/README.md",
+    "homepage": "https://github.com/wuzhiguocarter/call-graph/blob/master/README.md",
     "keywords": [
         "graphviz",
         "call graph",

@@ -1,5 +1,39 @@
 # Change Log
 
+## [1.2.9] 2025-03-11
+
+- Improved sequence diagram accuracy with source position-based ordering
+  - Enhanced call hierarchy nodes to track source code positions
+  - Implemented sorting of function calls based on their position in source code
+  - Fixed issue where sequence diagrams didn't reflect actual call order
+- Updated README with recent feature changes and improvements
+
+## [1.2.8] 2025-03-08
+
+- Fixed participant name formatting in Mermaid sequence diagrams
+  - Removed extra quotation marks in participant names
+- Improved file export functionality for sequence diagrams
+  - Added proper handling for SVG export and source code download
+  - Updated to use VSCode's save dialog for file operations
+
+## [1.2.6] 2025-03-06
+
+- Added Mermaid sequence diagram generation feature
+  - Generate sequence diagrams based on function call order from AST traversal
+  - New commands: "Show outgoing sequence diagram" and "Show incoming sequence diagram"
+  - Interactive diagram viewing with SVG and Mermaid file export options
+- Updated repository URLs
+- Renamed extension to "callviz" for marketplace uniqueness
+
+## [1.2.5] 2025-03-06
+
+- Same features as v1.2.4 with version bump for deployment
+
+## [1.2.4] 2025-03-05
+
+- add `call-graph.inDegreeThreshold` setting to filter nodes with in-degree greater than the threshold in incoming call graphs.
+- fix issue with duplicate edges appearing between the same nodes in the graph visualization.
+
 ## [1.2.3] 2024-12-19
 
 -   fix the issue that can't run any commands from v1.2.2 ([#31](https://github.com/beicause/call-graph/issues/31)).
