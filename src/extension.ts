@@ -97,8 +97,11 @@ const generateGraph = (
 
 interface WebviewMsg {
     command: string
-    type: 'dot' | 'svg'
-    data: string
+    type?: 'dot' | 'svg'
+    data?: string
+    filePath?: string
+    line?: number
+    character?: number
 }
 
 const registerWebviewPanelSerializer = (
@@ -164,6 +167,24 @@ export function activate(context: vscode.ExtensionContext) {
                     )
                 }
                 onDowload(msg.type)
+            } else if (msg.command === 'openFile') {
+                // Handle openFile command to jump to source code
+                if (msg.filePath && msg.line !== undefined && msg.character !== undefined) {
+                    const fileUri = vscode.Uri.file(msg.filePath);
+                    const position = new vscode.Position(msg.line, msg.character);
+                    
+                    // Open the file and show the position
+                    vscode.workspace.openTextDocument(fileUri).then(document => {
+                        vscode.window.showTextDocument(document).then(editor => {
+                            // Set the cursor position and reveal that range in the editor
+                            const range = new vscode.Range(position, position);
+                            editor.selection = new vscode.Selection(position, position);
+                            editor.revealRange(range, vscode.TextEditorRevealType.InCenter);
+                        });
+                    }).catch(error => {
+                        vscode.window.showErrorMessage(`Failed to open file: ${error.message}`);
+                    });
+                }
             }
         }
     const incomingDisposable = vscode.commands.registerCommand(

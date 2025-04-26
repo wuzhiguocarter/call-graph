@@ -18,6 +18,7 @@
             <button class="btn" id="downloadDot">save dot file</button>
             <button class="btn" id="downloadSvg">save as svg</button>
         </div>
+        <div id="tooltip" class="tooltip">Click to jump to source code</div>
     </body>
     <script>
         function updateSvgViewBox() {
@@ -41,6 +42,60 @@
                 .renderDot(dot, () => {
                     d3.select(window).on('resize.updatesvg', updateSvgViewBox)
                     updateSvgViewBox()
+                    
+                    const tooltip = document.getElementById('tooltip');
+                    
+                    // Add click event listeners to nodes
+                    d3.selectAll('.node').on('click', function() {
+                        // Get the node title which contains the file path and position
+                        const nodeTitle = d3.select(this).select('title').text();
+                        
+                        // Parse the node title to extract file path and position
+                        // Format is: "filepath#name@line:character"
+                        if (nodeTitle) {
+                            const match = nodeTitle.match(/"([^#]+)#([^@]+)@(\d+):(\d+)"/);
+                            if (match) {
+                                const [_, filePath, name, line, character] = match;
+                                
+                                // Send message to VS Code extension to open the file
+                                vscode.postMessage({
+                                    command: 'openFile',
+                                    filePath: filePath,
+                                    line: parseInt(line),
+                                    character: parseInt(character)
+                                });
+                            }
+                        }
+                    });
+                    
+                    // Add mouseover and mouseout events for tooltip
+                    d3.selectAll('.node')
+                        .on('mouseover', function(event) {
+                            const nodeTitle = d3.select(this).select('title').text();
+                            if (nodeTitle) {
+                                const match = nodeTitle.match(/"([^#]+)#([^@]+)@(\d+):(\d+)"/);
+                                if (match) {
+                                    const [_, filePath, name, line, character] = match;
+                                    // Show tooltip with file info
+                                    tooltip.innerHTML = `Click to open: ${name} (${filePath.split('/').pop()}:${line})`;
+                                    tooltip.style.display = 'block';
+                                    tooltip.style.left = (event.pageX + 10) + 'px';
+                                    tooltip.style.top = (event.pageY + 10) + 'px';
+                                }
+                            }
+                        })
+                        .on('mouseout', function() {
+                            // Hide tooltip
+                            tooltip.style.display = 'none';
+                        })
+                        .on('mousemove', function(event) {
+                            // Move tooltip with cursor
+                            tooltip.style.left = (event.pageX + 10) + 'px';
+                            tooltip.style.top = (event.pageY + 10) + 'px';
+                        });
+                    
+                    // Add cursor style to nodes to indicate they are clickable
+                    d3.selectAll('.node').style('cursor', 'pointer');
                 })
             d3.select('#downloadSvg').on('click', () => {
                 gv.resetZoom()
@@ -92,6 +147,38 @@
 
         .btn:hover {
             background-color: #0069d9;
+        }
+        
+        .node {
+            cursor: pointer;
+            transition: opacity 0.2s ease;
+        }
+        
+        .node:hover {
+            opacity: 0.8;
+        }
+        
+        .node:hover ellipse,
+        .node:hover polygon,
+        .node:hover rect {
+            stroke-width: 2px;
+            filter: drop-shadow(0px 0px 3px rgba(0, 123, 255, 0.5));
+        }
+        
+        .tooltip {
+            position: absolute;
+            display: none;
+            background-color: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            pointer-events: none;
+            z-index: 1000;
+            max-width: 300px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
     </style>
 </html>
