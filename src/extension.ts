@@ -45,6 +45,143 @@ const getHtmlContent = (
         return htmlTemplate.split('$MERMAID_FILE_URI').join(fileUri)
     }
 }
+
+interface WebviewMsg {
+    command: string
+    type?: 'dot' | 'svg'
+    data: string
+    filename?: string
+    contentType?: string
+}
+
+interface NavigateToSourceMsg {
+    command: 'navigateToSource'
+    data: {
+        type: 'participant' | 'call'
+        uri: string
+        range: {
+            start: { line: number, character: number }
+            end: { line: number, character: number }
+        }
+    }
+}
+
+const onReceiveMsgFactory =
+    (
+        type: 'Incoming' | 'Outgoing',
+        diagramType: 'Graph' | 'Sequence' | 'Class' = 'Graph',
+    ) =>
+    (msg: WebviewMsg | NavigateToSourceMsg) => {
+        const savedName =
+            type === 'Incoming'
+                ? diagramType === 'Graph'
+                    ? 'call_graph_incoming'
+                    : diagramType === 'Sequence'
+                      ? 'sequence_diagram_incoming'
+                      : 'class_diagram_incoming'
+                : diagramType === 'Graph'
+                  ? 'call_graph_outgoing'
+                  : diagramType === 'Sequence'
+                    ? 'sequence_diagram_outgoing'
+                    : 'class_diagram_outgoing'
+        
+        const workspace = vscode.workspace.workspaceFolders?.[0].uri
+        if (!workspace) {
+            vscode.window.showErrorMessage("Can't get workspace uri")
+            return
+        }
+        
+        if (msg.command === 'navigateToSource') {
+            const navMsg = msg as NavigateToSourceMsg
+            const sourceData = navMsg.data
+            
+            const uri = vscode.Uri.parse(sourceData.uri)
+            
+            const range = new vscode.Range(
+                new vscode.Position(sourceData.range.start.line, sourceData.range.start.character),
+                new vscode.Position(sourceData.range.end.line, sourceData.range.end.character)
+            )
+            
+            vscode.window.showTextDocument(uri, {
+                selection: range,
+                viewColumn: vscode.ViewColumn.One
+            }).then(editor => {
+                editor.revealRange(range, vscode.TextEditorRevealType.InCenter)
+                
+                const decorationType = vscode.window.createTextEditorDecorationType({
+                    backgroundColor: 'rgba(64, 158, 255, 0.2)',
+                    border: '1px solid rgba(64, 158, 255, 0.5)',
+                    borderRadius: '3px'
+                })
+                
+                editor.setDecorations(decorationType, [range])
+                
+                setTimeout(() => {
+                    decorationType.dispose()
+                }, 3000)
+            })
+        } else if (msg.command === 'download') {
+            const onDowload = async (fileType: 'dot' | 'svg') => {
+                const f = await vscode.window.showSaveDialog({
+                    filters:
+                        fileType === 'svg'
+                            ? { Image: ['svg'] }
+                            : { Graphviz: ['dot', 'gv'] },
+                    defaultUri: vscode.Uri.joinPath(
+                        workspace,
+                        `${savedName}.${fileType}`,
+                    ),
+                })
+                if (!f) return
+                fs.writeFileSync(f.fsPath, msg.data)
+                vscode.window.showInformationMessage(
+                    'Call Graph file saved: ' + f.fsPath,
+                )
+            }
+            onDowload(msg.type!)
+        } else if (msg.command === 'exportFile') {
+            const handleExport = async () => {
+                try {
+                    const filename = msg.filename || `${savedName}.txt`
+
+                    const filters: { [key: string]: string[] } = {}
+                    if (msg.contentType === 'image/svg+xml') {
+                        filters.Image = ['svg']
+                    } else if (msg.contentType === 'text/plain') {
+                        filters.Text = ['mmd', 'txt']
+                    } else {
+                        filters.All = ['*']
+                    }
+
+                    const f = await vscode.window.showSaveDialog({
+                        filters,
+                        defaultUri: vscode.Uri.joinPath(
+                            workspace,
+                            filename,
+                        ),
+                    })
+
+                    if (!f) return
+
+                    fs.writeFileSync(f.fsPath, msg.data)
+                    vscode.window.showInformationMessage(
+                        'File saved: ' + f.fsPath,
+                    )
+                } catch (error) {
+                    console.error('Error exporting file:', error)
+                    vscode.window.showErrorMessage(
+                        'Failed to export file: ' +
+                            (error instanceof Error
+                                ? error.message
+                                : String(error)),
+                    )
+                }
+            }
+
+            handleExport()
+        }
+    }
+
 const generateDiagram = (
     type: 'Incoming' | 'Outgoing',
     callNodeFunction: (
@@ -89,7 +226,6 @@ const generateDiagram = (
         if (ignoreFile && !fs.existsSync(ignoreFile)) ignoreFile = null
         const graph = await callNodeFunction(entry[0], item => {
             if (ignoreFile === null) return false
-            // working in the current workspace
             if (!item.uri.fsPath.startsWith(workspace.fsPath)) return true
             const ig = ignore().add(fs.readFileSync(ignoreFile).toString())
             const itemPath = item.uri.path.replace(`${workspace.path}/`, '')
@@ -119,14 +255,6 @@ const generateDiagram = (
         panel.webview.html = getHtmlContent(staticDir, fileUri, diagramType)
         panel.webview.onDidReceiveMessage(onReceiveMsg)
     }
-}
-
-interface WebviewMsg {
-    command: string
-    type: 'dot' | 'svg'
-    data: string
-    filename?: string
-    contentType?: string
 }
 
 const registerWebviewPanelSerializer = (
@@ -179,12 +307,13 @@ export function activate(context: vscode.ExtensionContext) {
     const classFileIncoming = vscode.Uri.file(
         path.resolve(staticDir, 'class_data_incoming.mmd'),
     )
+
     const onReceiveMsgFactory =
         (
             type: 'Incoming' | 'Outgoing',
             diagramType: 'Graph' | 'Sequence' | 'Class' = 'Graph',
         ) =>
-        (msg: WebviewMsg) => {
+        (msg: WebviewMsg | NavigateToSourceMsg) => {
             const savedName =
                 type === 'Incoming'
                     ? diagramType === 'Graph'
@@ -197,7 +326,36 @@ export function activate(context: vscode.ExtensionContext) {
                       : diagramType === 'Sequence'
                         ? 'sequence_diagram_outgoing'
                         : 'class_diagram_outgoing'
-            if (msg.command === 'download') {
+            if (msg.command === 'navigateToSource') {
+                const navMsg = msg as NavigateToSourceMsg
+                const sourceData = navMsg.data
+                
+                const uri = vscode.Uri.parse(sourceData.uri)
+                
+                const range = new vscode.Range(
+                    new vscode.Position(sourceData.range.start.line, sourceData.range.start.character),
+                    new vscode.Position(sourceData.range.end.line, sourceData.range.end.character)
+                )
+                
+                vscode.window.showTextDocument(uri, {
+                    selection: range,
+                    viewColumn: vscode.ViewColumn.One
+                }).then(editor => {
+                    editor.revealRange(range, vscode.TextEditorRevealType.InCenter)
+                    
+                    const decorationType = vscode.window.createTextEditorDecorationType({
+                        backgroundColor: 'rgba(64, 158, 255, 0.2)',
+                        border: '1px solid rgba(64, 158, 255, 0.5)',
+                        borderRadius: '3px'
+                    })
+                    
+                    editor.setDecorations(decorationType, [range])
+                    
+                    setTimeout(() => {
+                        decorationType.dispose()
+                    }, 3000)
+                })
+            } else if (msg.command === 'download') {
                 const onDowload = async (fileType: 'dot' | 'svg') => {
                     const f = await vscode.window.showSaveDialog({
                         filters:
@@ -215,15 +373,12 @@ export function activate(context: vscode.ExtensionContext) {
                         'Call Graph file saved: ' + f.fsPath,
                     )
                 }
-                onDowload(msg.type)
+                onDowload(msg.type!)
             } else if (msg.command === 'exportFile') {
-                // Handle the exportFile command from sequence.html
                 const handleExport = async () => {
                     try {
-                        // Determine file extension based on contentType or use the one in filename
                         const filename = msg.filename || `${savedName}.txt`
 
-                        // Set up filters based on content type
                         const filters: { [key: string]: string[] } = {}
                         if (msg.contentType === 'image/svg+xml') {
                             filters.Image = ['svg']
@@ -261,6 +416,7 @@ export function activate(context: vscode.ExtensionContext) {
                 handleExport()
             }
         }
+
     const incomingDisposable = vscode.commands.registerCommand(
         'CallGraph.showIncomingCallGraph',
         async () => {
@@ -294,7 +450,6 @@ export function activate(context: vscode.ExtensionContext) {
         },
     )
 
-    // New commands for sequence diagrams
     const incomingSequenceDisposable = vscode.commands.registerCommand(
         'CallGraph.showIncomingSequenceDiagram',
         async () => {
@@ -327,7 +482,7 @@ export function activate(context: vscode.ExtensionContext) {
             )
         },
     )
-    // New commands for class diagrams
+
     const incomingClassDisposable = vscode.commands.registerCommand(
         'CallGraph.showIncomingClassDiagram',
         async () => {
@@ -360,7 +515,7 @@ export function activate(context: vscode.ExtensionContext) {
             )
         },
     )
-    // Register serializers for call graph webviews
+
     registerWebviewPanelSerializer(
         staticDir,
         `CallGraph.previewGraphIncoming`,
@@ -372,7 +527,6 @@ export function activate(context: vscode.ExtensionContext) {
         onReceiveMsgFactory('Outgoing', 'Graph'),
     )
 
-    // Register serializers for sequence diagram webviews
     registerWebviewPanelSerializer(
         staticDir,
         `CallGraph.previewSequenceIncoming`,
@@ -384,7 +538,6 @@ export function activate(context: vscode.ExtensionContext) {
         onReceiveMsgFactory('Outgoing', 'Sequence'),
     )
 
-    // Register serializers for class diagram webviews
     registerWebviewPanelSerializer(
         staticDir,
         `CallGraph.previewClassIncoming`,
@@ -396,7 +549,6 @@ export function activate(context: vscode.ExtensionContext) {
         onReceiveMsgFactory('Outgoing', 'Class'),
     )
 
-    // Add all disposables to context
     context.subscriptions.push(
         incomingDisposable,
         outgoingDisposable,

@@ -23,6 +23,9 @@ export function generateMermaid(graph: CallHierarchyNode, path: string) {
     // 获取工作区根路径
     const workspaceRoot =
         vscode.workspace.workspaceFolders?.[0].uri.fsPath || ''
+    
+    // Store source code locations for participants and calls
+    const sourceLocations = new Map<string, { uri: string, range: vscode.Range }>()
 
     // Sets to track visited nodes and detect cycles
     const visited = new Set<string>()
@@ -49,11 +52,18 @@ export function generateMermaid(graph: CallHierarchyNode, path: string) {
         visited,
         orderedCalls,
         inDegreeThreshold,
+        sourceLocations
     )
 
     // 添加参与者到图表（使用相对路径）
     participants.forEach((displayName, filePath) => {
         mermaid.addParticipant(filePath, displayName)
+        
+        // Store source location for the participant
+        if (sourceLocations.has(filePath)) {
+            const location = sourceLocations.get(filePath)!
+            mermaid.addParticipantClick(displayName, location.uri, location.range)
+        }
     })
 
     // Use the ordered calls instead of topological sort
@@ -66,6 +76,20 @@ export function generateMermaid(graph: CallHierarchyNode, path: string) {
                 participants.get(calleePath)!,
                 callLabel,
             )
+            
+            // Add click handler for the call if we have source location
+            const callKey = `${callerPath}:${callLabel}:${calleePath}`
+            if (sourceLocations.has(callKey)) {
+                const location = sourceLocations.get(callKey)!
+                mermaid.addCallClick(
+                    participants.get(callerPath)!,
+                    participants.get(calleePath)!,
+                    callLabel,
+                    location.uri,
+                    location.range
+                )
+            }
+            
             callSignatures.add(signature)
         }
     })
@@ -91,6 +115,7 @@ function traverseForCallGraph(
     visited: Set<string> = new Set(),
     orderedCalls: Array<[string, string, string]> = [],
     inDegreeThreshold: number = 5,
+    sourceLocations: Map<string, { uri: string, range: vscode.Range }> = new Map()
 ) {
     // 获取文件相对路径作为参与者标识
     const fullPath = node.item.uri.fsPath
@@ -105,6 +130,12 @@ function traverseForCallGraph(
             '#' +
             crypto.randomBytes(2).toString('hex')
         participants.set(callerPath, callerShortName)
+        
+        // Store source location for the caller
+        sourceLocations.set(callerPath, {
+            uri: node.item.uri.toString(),
+            range: node.item.range
+        })
     }
 
     // Sort children by source position before processing
@@ -164,6 +195,12 @@ function traverseForCallGraph(
                 '#' +
                 crypto.randomBytes(2).toString('hex')
             participants.set(calleePath, calleeShortName)
+            
+            // Store source location for the callee
+            sourceLocations.set(calleePath, {
+                uri: child.item.uri.toString(),
+                range: child.item.range
+            })
         }
 
         // 添加调用关系到图
@@ -177,6 +214,18 @@ function traverseForCallGraph(
 
         // Add to ordered calls to preserve sequence
         orderedCalls.push([callerPath, calleePath, callLabel])
+        
+        // Store source location for the call if we have source position
+        if (child.sourcePosition) {
+            const callKey = `${callerPath}:${callLabel}:${calleePath}`
+            sourceLocations.set(callKey, {
+                uri: node.item.uri.toString(),
+                range: new vscode.Range(
+                    child.sourcePosition,
+                    child.sourcePosition.translate(0, callLabel.length)
+                )
+            })
+        }
 
         // 递归处理子节点
         if (!visited.has(child.item.uri.fsPath)) {
@@ -189,6 +238,7 @@ function traverseForCallGraph(
                 visited,
                 orderedCalls,
                 inDegreeThreshold,
+                sourceLocations
             )
         }
     })
@@ -201,11 +251,12 @@ class MermaidSequenceDiagram {
     private _content = ''
     private _participants: string[] = []
     private _calls: string[] = []
+    private _clicks: string[] = []
     private _participantIds: Map<string, string> = new Map()
     private _idCounter = 0
 
     constructor() {
-        this._content = 'sequenceDiagram\n'
+        this._content = 'sequenceDiagram\\n'
     }
 
     /**
@@ -239,6 +290,54 @@ class MermaidSequenceDiagram {
         // Use just the shortName as the display name - it's already more readable
         // in the getUniqueShortName function
         this._participants.push(`    participant ${safeId} as ${safeShortName}`)
+    }
+
+    /**
+     * Add a click handler for a participant
+     * @param participantName The name of the participant
+     * @param uri The URI of the source file
+     * @param range The range in the source file
+     */
+    addParticipantClick(participantName: string, uri: string, range: vscode.Range) {
+        const safeId = this.getSafeId(participantName)
+        const encodedData = encodeURIComponent(JSON.stringify({
+            type: 'participant',
+            uri: uri,
+            range: {
+                start: { line: range.start.line, character: range.start.character },
+                end: { line: range.end.line, character: range.end.character }
+            }
+        }))
+        this._clicks.push(`    click ${safeId} callback "Navigate to source code" "vscode-source:${encodedData}"`)
+    }
+
+    /**
+     * Add a click handler for a call
+     * @param from The participant making the call
+     * @param to The participant receiving the call
+     * @param label The label for the call
+     * @param uri The URI of the source file
+     * @param range The range in the source file
+     */
+    addCallClick(from: string, to: string, label: string, uri: string, range: vscode.Range) {
+        // For calls, we can't directly add click handlers in Mermaid sequence diagrams
+        // Instead, we'll add a note with a click handler
+        const safeFrom = this.getSafeId(from)
+        const safeTo = this.getSafeId(to)
+        const noteId = `note_${safeFrom}_${safeTo}_${this._idCounter++}`
+        
+        // Add a hidden note that will be used for the click handler
+        this._calls.push(`    Note over ${safeFrom},${safeTo}: ${label}`)
+        
+        const encodedData = encodeURIComponent(JSON.stringify({
+            type: 'call',
+            uri: uri,
+            range: {
+                start: { line: range.start.line, character: range.start.character },
+                end: { line: range.end.line, character: range.end.character }
+            }
+        }))
+        this._clicks.push(`    click ${noteId} callback "Navigate to source code" "vscode-source:${encodedData}"`)
     }
 
     /**
@@ -315,13 +414,15 @@ class MermaidSequenceDiagram {
      * Convert the diagram to a string
      */
     toString(): string {
-        // Combine all participants and calls
+        // Combine all participants, calls, and clicks
         return (
             this._content +
-            this._participants.join('\n') +
-            '\n' +
-            this._calls.join('\n') +
-            '\n'
+            this._participants.join('\\n') +
+            '\\n' +
+            this._calls.join('\\n') +
+            '\\n' +
+            this._clicks.join('\\n') +
+            '\\n'
         )
     }
 }
