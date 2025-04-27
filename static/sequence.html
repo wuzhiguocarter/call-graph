@@ -50,6 +50,20 @@
                 border-radius: 4px;
                 margin-top: 10px;
             }
+            .clickable-element {
+                cursor: pointer;
+            }
+            .tooltip {
+                position: absolute;
+                background: rgba(0, 0, 0, 0.8);
+                color: white;
+                padding: 5px 10px;
+                border-radius: 4px;
+                font-size: 12px;
+                pointer-events: none;
+                z-index: 1000;
+                display: none;
+            }
         </style>
     </head>
     <body>
@@ -61,6 +75,7 @@
             <button onclick="downloadMMD()">下载源码</button>
         </div>
         <div id="chart-container"></div>
+        <div id="tooltip" class="tooltip">点击跳转到源代码</div>
 
         <script>
             const vscode = acquireVsCodeApi()
@@ -88,6 +103,7 @@
                         boxMargin: '5px',
                         noteMargin: '5px',
                     },
+                    securityLevel: 'loose', // Required for click callbacks
                 })
             }
 
@@ -105,10 +121,57 @@
                             if (svg) {
                                 initPanZoom(svg)
                                 resetView()
+                                setupClickHandlers()
                             }
                         })
                     })
                     .catch(showError)
+            }
+
+            function setupClickHandlers() {
+                window.callback = function(elementId, encodedData) {
+                    try {
+                        const dataStr = decodeURIComponent(
+                            encodedData.replace('vscode-source:', '')
+                        )
+                        const data = JSON.parse(dataStr)
+                        
+                        vscode.postMessage({
+                            command: 'navigateToSource',
+                            data: data
+                        })
+                        
+                        return false
+                    } catch (error) {
+                        console.error('Error handling click:', error)
+                        showError(error)
+                    }
+                }
+                
+                const svg = document.querySelector('#chart-container svg')
+                if (svg) {
+                    const clickableElements = svg.querySelectorAll('[id^="participant_"], [id^="note_"]')
+                    const tooltip = document.getElementById('tooltip')
+                    
+                    clickableElements.forEach(element => {
+                        element.classList.add('clickable-element')
+                        
+                        element.addEventListener('mouseenter', function(e) {
+                            tooltip.style.display = 'block'
+                            tooltip.style.left = e.pageX + 10 + 'px'
+                            tooltip.style.top = e.pageY + 10 + 'px'
+                        })
+                        
+                        element.addEventListener('mousemove', function(e) {
+                            tooltip.style.left = e.pageX + 10 + 'px'
+                            tooltip.style.top = e.pageY + 10 + 'px'
+                        })
+                        
+                        element.addEventListener('mouseleave', function() {
+                            tooltip.style.display = 'none'
+                        })
+                    })
+                }
             }
 
             let scale = 1
@@ -200,14 +263,12 @@
             function resetView() {
                 const svg = document.querySelector('#chart-container svg')
                 if (svg) {
-                    // Get the bounding box of all content in the SVG
                     const allElements = svg.querySelectorAll('*')
                     let minX = Infinity,
                         minY = Infinity,
                         maxX = 0,
                         maxY = 0
 
-                    // Try to get the actual content bounds
                     allElements.forEach(el => {
                         try {
                             if (el.getBBox) {
@@ -218,11 +279,9 @@
                                 maxY = Math.max(maxY, bbox.y + bbox.height)
                             }
                         } catch (e) {
-                            // Ignore elements that don't have getBBox
                         }
                     })
 
-                    // If we couldn't determine bounds, use the SVG dimensions
                     if (
                         minX === Infinity ||
                         minY === Infinity ||
@@ -234,7 +293,6 @@
                         viewBox.w = svg.width.baseVal.value || 1200
                         viewBox.h = svg.height.baseVal.value || 800
                     } else {
-                        // Add some padding around the content
                         const padding = 50
                         viewBox.x = minX - padding
                         viewBox.y = minY - padding
@@ -258,10 +316,8 @@
                 }
 
                 try {
-                    // Clone the SVG to avoid modifying the displayed one
                     const clonedSvg = svg.cloneNode(true)
 
-                    // Make sure the SVG has proper dimensions
                     if (
                         !clonedSvg.getAttribute('width') ||
                         !clonedSvg.getAttribute('height')
@@ -274,7 +330,6 @@
                     const serializer = new XMLSerializer()
                     const source = serializer.serializeToString(clonedSvg)
 
-                    // Use VSCode messaging to trigger the download
                     vscode.postMessage({
                         command: 'exportFile',
                         data: source,
@@ -307,7 +362,6 @@
                             return response.text()
                         })
                         .then(text => {
-                            // Use VSCode messaging to trigger the download
                             vscode.postMessage({
                                 command: 'exportFile',
                                 data: text,
@@ -332,28 +386,22 @@
                 document.body.appendChild(errorDiv)
             }
 
-            // Handle window resize to adjust SVG dimensions
             function handleWindowResize() {
                 const svg = document.querySelector('#chart-container svg')
                 if (svg) {
-                    // Always ensure the SVG has proper responsive attributes
                     svg.setAttribute('width', '100%')
                     svg.setAttribute('height', '100%')
                     svg.style.minWidth = '90%'
                     svg.style.maxWidth = '100%'
 
-                    // Update the SVG viewBox if needed
                     if (scale !== 1) {
-                        // Maintain the current zoom level while resizing
                         updateSVGViewBox()
                     } else {
-                        // If at default zoom, reset the view for best fit
                         resetView()
                     }
                 }
             }
 
-            // Add window resize event listener
             window.addEventListener('resize', handleWindowResize)
 
             initMermaid()
