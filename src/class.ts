@@ -68,6 +68,62 @@ export function generateClassDiagram(graph: CallHierarchyNode, path: string) {
         mermaid.addRelationship(relationship)
     })
 
+    // --- TESTING GLOBAL HIERARCHY ---
+    // Fetch all classes and interfaces (simulate for now or call if async is okay here)
+    // For testing, let's create a dummy map. In a real scenario, this would be populated
+    // by fetchAllClassesAndInterfaces.
+    const globalClassesForTest = new Map<string, ClassInfo>()
+    globalClassesForTest.set('MyNamespace.MyClass', {
+        type: 'class',
+        methods: ['doSomething'],
+        properties: ['myProp'],
+        namespace: 'MyNamespace',
+        superClass: 'MyNamespace.BaseClass',
+        interfaces: ['MyNamespace.MyInterface', 'AnotherInterface'],
+    })
+    globalClassesForTest.set('MyNamespace.BaseClass', {
+        type: 'class',
+        methods: ['baseMethod'],
+        properties: [],
+        namespace: 'MyNamespace',
+    })
+    globalClassesForTest.set('MyNamespace.MyInterface', {
+        type: 'interface',
+        methods: ['myInterfaceMethod'],
+        properties: [],
+        namespace: 'MyNamespace',
+    })
+    globalClassesForTest.set('AnotherInterface', {
+        type: 'interface',
+        methods: [],
+        properties: [],
+    })
+    globalClassesForTest.set('MyNamespace.DerivedFromBase', {
+      type: 'class',
+      methods: [],
+      properties: [],
+      namespace: 'MyNamespace',
+      superClass: 'MyNamespace.BaseClass'
+    })
+
+
+    // Add classes from the global fetch to the diagram (if not already added by call hierarchy)
+    globalClassesForTest.forEach((classInfo, className) => {
+        if (!classes.has(className)) { // Avoid duplicating class definitions
+            mermaid.addClass(className, classInfo)
+        }
+        // Add inheritance and implementation relationships
+        if (classInfo.superClass) {
+            mermaid.addInheritance(className, classInfo.superClass)
+        }
+        if (classInfo.interfaces) {
+            classInfo.interfaces.forEach(interfaceName => {
+                mermaid.addImplementation(className, interfaceName)
+            })
+        }
+    })
+    // --- END TESTING GLOBAL HIERARCHY ---
+
     // Save the generated diagram to a file
     fs.writeFileSync(path, mermaid.toString())
     output.appendLine('Generated Mermaid class diagram: ' + path)
@@ -80,9 +136,21 @@ export function generateClassDiagram(graph: CallHierarchyNode, path: string) {
  */
 interface ClassInfo {
     type: 'class' | 'interface'
-    methods: string[]
-    properties: string[]
+    methods: MethodInfo[] // Updated from string[]
+    properties: string[] // Could become PropertyInfo[] if needed
     namespace?: string
+    superClass?: string
+    interfaces?: string[]
+    uri: string // URI of the file, fsPath
+    classRange?: vscode.Range // Range of the class declaration itself
+    // name?: string; // Removed temporary simple name storage
+}
+
+interface MethodInfo {
+    name: string;
+    range: vscode.Range;
+    selectionRange: vscode.Range;
+    // The URI is available from the parent ClassInfo
 }
 
 /**
@@ -188,7 +256,7 @@ function buildClassDiagram(
  * Extract class and method names from a function name and file path
  * Uses language-agnostic heuristics to work with multiple programming languages
  */
-function extractClassAndMethod(
+export function extractClassAndMethod( // Export this function
     fullName: string,
     filePath: string,
 ): { className: string; methodName: string | null } {
@@ -276,16 +344,214 @@ function extractClassAndMethod(
     }
 }
 
+export async function fetchAllClassesAndInterfaces(
+    workspaceRoot: string, // This might not be strictly needed if findFiles uses global patterns
+    token?: vscode.CancellationToken,
+): Promise<Map<string, ClassInfo>> {
+    const classMap = new Map<string, ClassInfo>()
+
+    const configuration = vscode.workspace.getConfiguration('call-graph.globalDiagram');
+    const includePattern = configuration.get<string>('include', '**/*.ts');
+    const excludeSetting = configuration.get<string>('exclude', '**/node_modules/**,**/*.spec.ts,**/*.test.ts');
+    // vscode.workspace.findFiles exclude patterns are a single string, comma-separated, or a RelativePattern.
+    // If excludeSetting is null or empty, pass null to findFiles.
+    const excludePattern = excludeSetting && excludeSetting.trim() !== '' ? excludeSetting : null;
+
+
+    const files = await vscode.workspace.findFiles(includePattern, excludePattern, undefined /*maxResults*/, token);
+    if (token?.isCancellationRequested) return classMap;
+
+    for (const file of files) {
+        if (token?.isCancellationRequested) break;
+        try {
+            const document = await vscode.workspace.openTextDocument(file);
+            await parseFileContent(document, classMap, workspaceRoot); // workspaceRoot is used by parseFileContent for context
+        } catch (e) {
+            output.appendLine(`Error opening or parsing file ${file.fsPath}: ${e}`);
+        }
+    }
+    if (token?.isCancellationRequested) return classMap;
+
+    // Second pass: Populate methods using DocumentSymbolProvider
+    for (const [qualifiedName, classInfo] of classMap.entries()) {
+        if (token?.isCancellationRequested) break;
+        try {
+            const uri = vscode.Uri.file(classInfo.uri);
+            // executeDocumentSymbolProvider itself does not directly accept a CancellationToken in its signature.
+            // However, the operation is part of a larger cancellable process.
+            const symbols: vscode.DocumentSymbol[] | undefined =
+                await vscode.languages.executeDocumentSymbolProvider(uri);
+
+            if (symbols) {
+                const simpleClassName = qualifiedName.split('.').pop() || qualifiedName;
+                populateMethodsFromSymbols(classInfo, symbols, simpleClassName);
+            }
+        } catch (e) {
+            output.appendLine(`Error fetching symbols for ${classInfo.uri}: ${e}`);
+        }
+    }
+
+    return classMap
+}
+
+// Helper function to find a symbol by name (simple match, might need refinement for overloaded methods etc.)
+function findSymbol(symbols: vscode.DocumentSymbol[], name: string, kind: vscode.SymbolKind): vscode.DocumentSymbol | undefined {
+    for (const s of symbols) {
+        if (s.name === name && s.kind === kind) {
+            return s;
+        }
+        if (s.children.length > 0) {
+            const found = findSymbol(s.children, name, kind);
+            if (found) return found;
+        }
+    }
+    return undefined;
+}
+
+
+function populateMethodsFromSymbols(
+    classInfo: ClassInfo,
+    symbols: vscode.DocumentSymbol[],
+    simpleClassName: string, // The non-qualified name of the class
+    ) {
+    const classSymbol = findSymbol(symbols, simpleClassName, vscode.SymbolKind.Class) ||
+                        findSymbol(symbols, simpleClassName, vscode.SymbolKind.Interface);
+
+    if (classSymbol) {
+        classInfo.classRange = classSymbol.range; // Store class range
+        for (const childSymbol of classSymbol.children) {
+            if (childSymbol.kind === vscode.SymbolKind.Method || childSymbol.kind === vscode.SymbolKind.Function) {
+                classInfo.methods.push({
+                    name: childSymbol.name,
+                    range: childSymbol.range,
+                    selectionRange: childSymbol.selectionRange,
+                });
+            } else if (childSymbol.kind === vscode.SymbolKind.Property) {
+                // Optionally populate properties here if needed
+                // classInfo.properties.push(childSymbol.name);
+            }
+        }
+    }
+}
+
+
+async function parseFileContent( // Made async
+    document: vscode.TextDocument, // Changed from text: string
+    classMap: Map<string, ClassInfo>,
+    workspaceRoot: string,
+    // filePath: string, // filePath is document.uri.fsPath
+) {
+    const text = document.getText();
+    const filePath = document.uri.fsPath;
+    // Regular expression to find class and interface definitions
+    // This regex captures:
+    // 1. Optional namespace
+    // 2. "class" or "interface" keyword
+    // 3. Class/Interface name
+    // 4. Optional "extends" clause and the parent class name
+    // 5. Optional "implements" clause and the implemented interface names
+    const classInterfaceRegex =
+        /(class|interface)\s+([\w.]+)(?:\s+extends\s+([\w.]+))?(?:\s+implements\s+([\w.,\s]+))?/g
+    let match
+
+    // This is a simplified way to get the namespace.
+    // It finds the last declared namespace before the current match.
+    // This might not be perfectly accurate for complex nested structures or multiple namespaces in a file.
+    const namespaceRegex = /namespace\s+([\w.]+)\s*{/g
+    let lastNamespace: string | undefined
+    let nsMatch
+    // Store all namespace declarations with their start indices
+    const namespacesInFile: { name: string; startIndex: number; endIndex: number }[] = []
+    while((nsMatch = namespaceRegex.exec(text)) !== null) {
+        // Find the corresponding closing brace for the namespace
+        let openBraces = 1
+        let endIndex = nsMatch.index + nsMatch[0].length
+        for (let i = endIndex; i < text.length; i++) {
+            if (text[i] === '{') {
+                openBraces++
+            } else if (text[i] === '}') {
+                openBraces--
+                if (openBraces === 0) {
+                    endIndex = i
+                    break
+                }
+            }
+        }
+        namespacesInFile.push({ name: nsMatch[1], startIndex: nsMatch.index, endIndex })
+    }
+
+
+    while ((match = classInterfaceRegex.exec(text)) !== null) {
+        const type = match[1] as 'class' | 'interface'
+        const name = match[2]
+        const superClass = match[3]
+        const implementedInterfaces = match[4]
+            ? match[4].split(',').map(s => s.trim())
+            : []
+
+        let currentNamespace: string | undefined
+        // Check if this class/interface is inside any of the found namespaces
+        for (const ns of namespacesInFile) {
+            if (match.index > ns.startIndex && match.index < ns.endIndex) {
+                currentNamespace = ns.name
+                // TODO: Handle nested namespaces if necessary, e.g., append to parent namespace
+                break
+            }
+        }
+
+        let qualifiedName = name
+        if (currentNamespace) {
+            qualifiedName = `${currentNamespace}.${name}`
+        }
+
+        // TODO: Extract methods and properties if possible
+        // For now, initialize with empty arrays
+        // Store the simple name for symbol matching if needed, or parse it from qualifiedName
+        const simpleName = name; // This is the regex-captured name, assumed to be simple
+
+        const classInfo: ClassInfo = {
+            type,
+            methods: [], // Will be populated by populateMethodsFromSymbols
+            properties: [],
+            namespace: currentNamespace,
+            superClass,
+            interfaces: implementedInterfaces,
+            uri: filePath, // Store the file URI
+            // name: simpleName, // This was temporary, removed.
+        };
+
+        classMap.set(qualifiedName, classInfo)
+    }
+}
+
 /**
  * Class to generate a Mermaid class diagram
  */
-class MermaidClassDiagram {
+export class MermaidClassDiagram {
     private _content = ''
     private _classes: string[] = []
     private _relationships: string[] = []
 
     constructor() {
         this._content = 'classDiagram\n'
+    }
+
+    /**
+     * Add an inheritance relationship to the diagram (e.g., Parent <|-- Child)
+     * @param childClass The name of the child class
+     * @param parentClass The name of the parent class
+     */
+    addInheritance(childClass: string, parentClass: string) {
+        this._relationships.push(`    ${parentClass} <|-- ${childClass}`)
+    }
+
+    /**
+     * Add an interface implementation relationship to the diagram (e.g., Interface <|.. Class)
+     * @param implementingClass The name of the implementing class
+     * @param interfaceName The name of the interface
+     */
+    addImplementation(implementingClass: string, interfaceName: string) {
+        this._relationships.push(`    ${interfaceName} <|.. ${implementingClass}`)
     }
 
     /**

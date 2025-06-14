@@ -18,6 +18,7 @@
         "onCommand:CallGraph.showIncomingSequenceDiagram",
         "onCommand:CallGraph.showOutgoingClassDiagram",
         "onCommand:CallGraph.showIncomingClassDiagram",
+        "onCommand:CallGraph.showGlobalComponentDiagram",
         "onWebviewPanel:CallGraph.previewGraphIncoming",
         "onWebviewPanel:CallGraph.previewGraphOutgoing",
         "onWebviewPanel:CallGraph.previewSequenceIncoming",
@@ -51,6 +52,10 @@
             {
                 "command": "CallGraph.showIncomingClassDiagram",
                 "title": "CallGraph: Show incoming class diagram"
+            },
+            {
+                "command": "CallGraph.showGlobalComponentDiagram",
+                "title": "CallGraph: Show Global Component Diagram"
             }
         ],
         "menus": {
@@ -72,6 +77,9 @@
                 },
                 {
                     "command": "CallGraph.showIncomingClassDiagram"
+                },
+                {
+                    "command": "CallGraph.showGlobalComponentDiagram"
                 }
             ]
         },
@@ -92,6 +100,16 @@
                     "type": "number",
                     "default": 5,
                     "description": "filter nodes with in-degree greater than this threshold. Set to 5 to disable filtering"
+                },
+                "call-graph.globalDiagram.include": {
+                    "type": "string",
+                    "default": "**/*.ts",
+                    "description": "Glob pattern for files to include in the global component diagram. (e.g., 'src/**/*.ts')"
+                },
+                "call-graph.globalDiagram.exclude": {
+                    "type": "string",
+                    "default": "**/node_modules/**,**/*.spec.ts,**/*.test.ts",
+                    "description": "Glob pattern for files/directories to exclude from the global component diagram."
                 }
             }
         }

@@ -6,7 +6,7 @@ import {
 } from './call'
 import { generateDot } from './dot'
 import { generateMermaid } from './mermaid'
-import { generateClassDiagram } from './class'
+import { generateClassDiagram, fetchAllClassesAndInterfaces, MermaidClassDiagram, ClassInfo, extractClassAndMethod } from './class' // Added extractClassAndMethod
 import * as path from 'path'
 import * as fs from 'fs'
 import ignore from 'ignore'
@@ -181,22 +181,25 @@ export function activate(context: vscode.ExtensionContext) {
     )
     const onReceiveMsgFactory =
         (
-            type: 'Incoming' | 'Outgoing',
+            type: 'Incoming' | 'Outgoing' | 'Global', // Added 'Global'
             diagramType: 'Graph' | 'Sequence' | 'Class' = 'Graph',
         ) =>
         (msg: WebviewMsg) => {
-            const savedName =
-                type === 'Incoming'
-                    ? diagramType === 'Graph'
-                        ? 'call_graph_incoming'
-                        : diagramType === 'Sequence'
-                          ? 'sequence_diagram_incoming'
-                          : 'class_diagram_incoming'
-                    : diagramType === 'Graph'
-                      ? 'call_graph_outgoing'
-                      : diagramType === 'Sequence'
-                        ? 'sequence_diagram_outgoing'
-                        : 'class_diagram_outgoing'
+            let savedName: string;
+            if (type === 'Incoming') {
+                savedName = diagramType === 'Graph' ? 'call_graph_incoming' :
+                            diagramType === 'Sequence' ? 'sequence_diagram_incoming' :
+                            'class_diagram_incoming';
+            } else if (type === 'Outgoing') {
+                savedName = diagramType === 'Graph' ? 'call_graph_outgoing' :
+                            diagramType === 'Sequence' ? 'sequence_diagram_outgoing' :
+                            'class_diagram_outgoing';
+            } else { // Global
+                savedName = diagramType === 'Class' ? 'global_component_diagram' :
+                            diagramType === 'Graph' ? 'global_call_graph' : // Placeholder for future
+                            'global_diagram'; // Default global name
+            }
+
             if (msg.command === 'download') {
                 const onDowload = async (fileType: 'dot' | 'svg') => {
                     const f = await vscode.window.showSaveDialog({
@@ -405,4 +408,158 @@ export function activate(context: vscode.ExtensionContext) {
         incomingClassDisposable,
         outgoingClassDisposable,
     )
+
+    // Command for Global Component Diagram
+    const globalComponentDiagramDisposable = vscode.commands.registerCommand(
+        'CallGraph.showGlobalComponentDiagram',
+        async () => {
+            try {
+                output.appendLine('Generating Global Component Diagram...');
+                await vscode.window.withProgress(
+                    getDefaultProgressOptions('Generating Global Component Diagram'),
+                    async (progress, token) => {
+                        token.onCancellationRequested(() => {
+                            output.appendLine('Global Component Diagram generation cancelled.');
+                        });
+
+                        const workspaceFolders = vscode.workspace.workspaceFolders;
+                        if (!workspaceFolders || workspaceFolders.length === 0) {
+                            vscode.window.showErrorMessage('No workspace folder open.');
+                            output.appendLine('Error: No workspace folder open.');
+                            return;
+                        }
+                        const workspaceRoot = workspaceFolders[0].uri.fsPath;
+                        output.appendLine(`Workspace root: ${workspaceRoot}`);
+
+                        progress.report({ message: 'Fetching all classes and interfaces...' });
+                        // Ensure imports from class.ts are at the top of the file
+                        // import { fetchAllClassesAndInterfaces, ClassInfo, MermaidClassDiagram, extractClassAndMethod } from './class';
+                        const allClassesMap = await fetchAllClassesAndInterfaces(workspaceRoot, token); // Pass token
+                        output.appendLine(`Found ${allClassesMap.size} classes/interfaces.`);
+                        if (token.isCancellationRequested) return;
+
+                        progress.report({ message: 'Generating Mermaid diagram (hierarchy)...' });
+                        const mermaidDiagram = new MermaidClassDiagram();
+
+                        allClassesMap.forEach((classInfo, qualifiedName) => {
+                            mermaidDiagram.addClass(qualifiedName, classInfo);
+                            if (classInfo.superClass) {
+                                mermaidDiagram.addInheritance(qualifiedName, classInfo.superClass);
+                            }
+                            if (classInfo.interfaces && classInfo.interfaces.length > 0) {
+                                classInfo.interfaces.forEach(interfaceName => {
+                                    mermaidDiagram.addImplementation(qualifiedName, interfaceName);
+                                });
+                            }
+                        });
+                        if (token.isCancellationRequested) return;
+
+                        // --- Add Collaboration Analysis ---
+                        progress.report({ message: 'Analyzing method collaborations...' });
+                        output.appendLine('Analyzing method collaborations...');
+                        const collaborationRelationships = new Set<string>();
+
+                        for (const [sourceQualifiedName, sourceClassInfo] of allClassesMap) {
+                            if (token.isCancellationRequested) break;
+                            if (sourceClassInfo.type === 'class' && sourceClassInfo.methods && sourceClassInfo.methods.length > 0) {
+                                output.appendLine(`Processing class: ${sourceQualifiedName} with ${sourceClassInfo.methods.length} methods`);
+                                for (const methodInfo of sourceClassInfo.methods) {
+                                    if (token.isCancellationRequested) break;
+                                    const methodUri = vscode.Uri.file(sourceClassInfo.uri);
+                                    const callHierarchyItem = new vscode.CallHierarchyItem(
+                                        methodUri,
+                                        methodInfo.name,
+                                        `${sourceQualifiedName}.${methodInfo.name}`, // detail
+                                        vscode.SymbolKind.Method, // kind
+                                        methodInfo.range,
+                                        methodInfo.selectionRange
+                                    );
+
+                                    try {
+                                        const outgoingCalls: vscode.CallHierarchyOutgoingCall[] | undefined =
+                                            await vscode.commands.executeCommand<vscode.CallHierarchyOutgoingCall[]>(
+                                                'vscode.provideOutgoingCalls',
+                                                callHierarchyItem
+                                            );
+
+                                        if (outgoingCalls) {
+                                            for (const call of outgoingCalls) {
+                                                const targetInfo = extractClassAndMethod(call.to.name, call.to.uri.fsPath);
+                                                const targetQualifiedName = targetInfo.className;
+
+                                                if (targetQualifiedName && sourceQualifiedName !== targetQualifiedName) {
+                                                    // Ensure target class exists in our map to avoid phantom relationships
+                                                    if (allClassesMap.has(targetQualifiedName)) {
+                                                        const relationshipString = `${sourceQualifiedName} ..> ${targetQualifiedName} : uses`;
+                                                        if (!collaborationRelationships.has(relationshipString)) {
+                                                            mermaidDiagram.addRelationship(relationshipString);
+                                                            collaborationRelationships.add(relationshipString);
+                                                            output.appendLine(`Added collaboration: ${relationshipString}`);
+                                                        }
+                                                    } else {
+                                                        output.appendLine(`Target class ${targetQualifiedName} not in allClassesMap. Skipping relationship from ${sourceQualifiedName} to it.`);
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    } catch (e) {
+                                        output.appendLine(`Error providing outgoing calls for ${sourceQualifiedName}.${methodInfo.name}: ${e}`);
+                                    }
+                                }
+                            }
+                        }
+                        if (token.isCancellationRequested) return;
+                        output.appendLine('Finished analyzing method collaborations.');
+                        // --- End Collaboration Analysis ---
+
+                        const mermaidString = mermaidDiagram.toString();
+                        if (!mermaidString || mermaidString.trim() === 'classDiagram') {
+                            vscode.window.showInformationMessage('No classes or interfaces found to generate a diagram.');
+                            output.appendLine('No data for global component diagram.');
+                            return;
+                        }
+
+
+                        const globalDiagramFile = vscode.Uri.file(
+                            path.resolve(staticDir, 'global_component_diagram.mmd'),
+                        );
+                        fs.writeFileSync(globalDiagramFile.fsPath, mermaidString);
+                        output.appendLine(`Global component diagram data saved to: ${globalDiagramFile.fsPath}`);
+
+                        progress.report({ message: 'Displaying diagram...' });
+                        const panel = vscode.window.createWebviewPanel(
+                            'CallGraph.previewGlobalComponentDiagram', // Unique webview type
+                            'Global Component Diagram',
+                            vscode.ViewColumn.Beside,
+                            {
+                                localResourceRoots: [vscode.Uri.file(staticDir)],
+                                enableScripts: true,
+                            },
+                        );
+
+                        const fileUri = panel.webview.asWebviewUri(globalDiagramFile).toString();
+                        panel.webview.html = getHtmlContent(staticDir, fileUri, 'Class'); // Reusing class.html
+                        panel.webview.onDidReceiveMessage(
+                            onReceiveMsgFactory('Global', 'Class'), // Use 'Global' type
+                        );
+                        output.appendLine('Global Component Diagram panel created.');
+                    },
+                );
+            } catch (error) {
+                output.appendLine(`Error generating global component diagram: ${error}`);
+                vscode.window.showErrorMessage(
+                    'Failed to generate Global Component Diagram: ' +
+                        (error instanceof Error ? error.message : String(error)),
+                );
+            }
+        },
+    );
+    context.subscriptions.push(globalComponentDiagramDisposable);
+
+    // Serializer for Global Component Diagram (optional, but good for state restoration)
+    registerWebviewPanelSerializer(
+        staticDir,
+        'CallGraph.previewGlobalComponentDiagram',
+        onReceiveMsgFactory('Global', 'Class'),
+    );
 }
