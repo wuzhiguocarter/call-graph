@@ -116,7 +116,29 @@ const generateDiagram = (
             },
         )
         const fileUri = panel.webview.asWebviewUri(outputFile).toString()
-        panel.webview.html = getHtmlContent(staticDir, fileUri, diagramType)
+
+        // Get vendor URIs
+        const vendorDir = path.join(staticDir, 'vendor')
+        const d3Uri = panel.webview
+            .asWebviewUri(vscode.Uri.file(path.join(vendorDir, 'd3.min.js')))
+            .toString()
+        const graphvizUri = panel.webview
+            .asWebviewUri(
+                vscode.Uri.file(path.join(vendorDir, 'graphviz.umd.js')),
+            )
+            .toString()
+        const d3GraphvizUri = panel.webview
+            .asWebviewUri(
+                vscode.Uri.file(path.join(vendorDir, 'd3-graphviz.js')),
+            )
+            .toString()
+
+        let html = getHtmlContent(staticDir, fileUri, diagramType)
+        html = html.replace('./vendor/d3.min.js', d3Uri)
+        html = html.replace('./vendor/graphviz.umd.js', graphvizUri)
+        html = html.replace('./vendor/d3-graphviz.js', d3GraphvizUri)
+
+        panel.webview.html = html
         panel.webview.onDidReceiveMessage(onReceiveMsg)
     }
 }
@@ -145,7 +167,31 @@ const registerWebviewPanelSerializer = (
                 )
                 return
             }
-            webviewPanel.webview.html = getHtmlContent(staticDir, state)
+
+            // Get vendor URIs for deserialized panel
+            const vendorDir = path.join(staticDir, 'vendor')
+            const d3Uri = webviewPanel.webview
+                .asWebviewUri(
+                    vscode.Uri.file(path.join(vendorDir, 'd3.min.js')),
+                )
+                .toString()
+            const graphvizUri = webviewPanel.webview
+                .asWebviewUri(
+                    vscode.Uri.file(path.join(vendorDir, 'graphviz.umd.js')),
+                )
+                .toString()
+            const d3GraphvizUri = webviewPanel.webview
+                .asWebviewUri(
+                    vscode.Uri.file(path.join(vendorDir, 'd3-graphviz.js')),
+                )
+                .toString()
+
+            let html = getHtmlContent(staticDir, state)
+            html = html.replace('./vendor/d3.min.js', d3Uri)
+            html = html.replace('./vendor/graphviz.umd.js', graphvizUri)
+            html = html.replace('./vendor/d3-graphviz.js', d3GraphvizUri)
+
+            webviewPanel.webview.html = html
             webviewPanel.webview.onDidReceiveMessage(onReceiveMsg)
         },
     })
