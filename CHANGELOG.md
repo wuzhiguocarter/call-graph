@@ -1,5 +1,28 @@
 # Change Log
 
+## [1.4.0] 2026-08-02
+
+- Added type hierarchy diagrams
+    - New commands: "Show supertype hierarchy" and "Show subtype hierarchy"
+    - Built on the `vscode.provideSupertypes` / `vscode.provideSubtypes` language feature, so inheritance is reported by the language server instead of being inferred from call relations
+    - Generalization (`extends`) is drawn as a solid arrow, realization (`implements`) as a dashed one; interfaces, enums and structs are marked with a stereotype
+    - Honours the existing `maxDepth` and `ignoreFile` settings
+- Fixed "Can't resolve entry function" being raised whenever the cursor was not exactly on a symbol name
+    - The entry symbol is now retried once for a language server that is still starting up, then resolved from the enclosing function or type
+    - The error message explains what to do, and the unresolved position is written to the CallGraph output channel
+- Fixed restored webview panels always rendering with the call graph template, which broke sequence and class diagrams after a window reload
+- Fixed the webview panel serializers never being disposed
+- Added a unit test suite covering type hierarchy traversal, diagram generation and entry resolution, and wired it into CI
+- Updated the CI and release workflows to Node 22, since Node 20 reached end of life in April 2026
+
+## [1.3.2] 2025-10-31
+
+- Bundled the D3 and Graphviz libraries locally so call graphs render without network access
+
+## [1.3.1] 2025-03-21
+
+- Updated the Mermaid library to 11.4.1
+
 ## [1.3.0] 2025-03-12
 
 - Added class diagram generation and visualization feature

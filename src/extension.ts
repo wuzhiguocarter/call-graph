@@ -7,11 +7,36 @@ import {
 import { generateDot } from './dot'
 import { generateMermaid } from './mermaid'
 import { generateClassDiagram } from './class'
+import { getSubtypeNode, getSupertypeNode, TypeDirection } from './type'
+import { generateTypeDiagram } from './typeDiagram'
+import { resolveCallEntry, resolveTypeEntry } from './entry'
 import * as path from 'path'
 import * as fs from 'fs'
 import ignore from 'ignore'
 
 export const output = vscode.window.createOutputChannel('CallGraph')
+
+/** the webview template a diagram is rendered with */
+type Template = 'Graph' | 'Sequence' | 'Class'
+
+const TEMPLATE_FILES: Record<Template, string> = {
+    Graph: 'index.html',
+    Sequence: 'sequence.html',
+    Class: 'class.html',
+}
+
+/** decides whether a symbol is excluded by the configured ignore file */
+type IgnorePredicate = (item: { uri: vscode.Uri }) => boolean
+
+/**
+ * Resolves the entry symbol and writes the diagram source file.
+ * Returns false when no entry symbol could be resolved.
+ */
+type DiagramBuilder = (
+    editor: vscode.TextEditor,
+    isIgnored: IgnorePredicate,
+    outputPath: string,
+) => Promise<boolean>
 
 const getDefaultProgressOptions = (title: string): vscode.ProgressOptions => {
     return {
@@ -21,41 +46,101 @@ const getDefaultProgressOptions = (title: string): vscode.ProgressOptions => {
     }
 }
 
-const getHtmlContent = (
+const renderHtml = (
     staticDir: string,
+    webview: vscode.Webview,
     fileUri: string,
-    diagramType: 'Graph' | 'Sequence' | 'Class' = 'Graph',
+    template: Template,
 ) => {
     const htmlTemplate = fs
-        .readFileSync(
-            path.resolve(
-                staticDir,
-                diagramType === 'Graph'
-                    ? 'index.html'
-                    : diagramType === 'Sequence'
-                      ? 'sequence.html'
-                      : 'class.html',
-            ),
-        )
+        .readFileSync(path.resolve(staticDir, TEMPLATE_FILES[template]))
         .toString()
 
-    if (diagramType === 'Graph') {
-        return htmlTemplate.split('$DOT_FILE_URI').join(fileUri)
-    } else {
-        return htmlTemplate.split('$MERMAID_FILE_URI').join(fileUri)
+    const placeholder =
+        template === 'Graph' ? '$DOT_FILE_URI' : '$MERMAID_FILE_URI'
+    let html = htmlTemplate.split(placeholder).join(fileUri)
+
+    // the graph template loads its renderer from the bundled vendor directory,
+    // which has to be rewritten to a webview uri to be reachable
+    const vendorDir = path.join(staticDir, 'vendor')
+    const vendorUri = (file: string) =>
+        webview
+            .asWebviewUri(vscode.Uri.file(path.join(vendorDir, file)))
+            .toString()
+    html = html.replace('./vendor/d3.min.js', vendorUri('d3.min.js'))
+    html = html.replace(
+        './vendor/graphviz.umd.js',
+        vendorUri('graphviz.umd.js'),
+    )
+    html = html.replace('./vendor/d3-graphviz.js', vendorUri('d3-graphviz.js'))
+
+    return html
+}
+
+const callDiagramBuilder = (
+    getNode: (
+        entryItem: vscode.CallHierarchyItem,
+        isIgnored: IgnorePredicate,
+    ) => Promise<CallHierarchyNode>,
+    write: (graph: CallHierarchyNode, outputPath: string) => void,
+): DiagramBuilder => {
+    return async (editor, isIgnored, outputPath) => {
+        const entry = await resolveCallEntry(editor)
+        if (!entry) return false
+
+        output.appendLine('entry: ' + entry.name)
+        write(await getNode(entry, isIgnored), outputPath)
+        return true
     }
 }
-const generateDiagram = (
-    type: 'Incoming' | 'Outgoing',
-    callNodeFunction: (
-        entryItem: vscode.CallHierarchyItem,
-        ignore: (item: vscode.CallHierarchyItem) => boolean,
-    ) => Promise<CallHierarchyNode>,
-    outputFile: vscode.Uri,
-    staticDir: string,
-    onReceiveMsg: (msg: WebviewMsg) => void,
-    diagramType: 'Graph' | 'Sequence' | 'Class' = 'Graph',
-) => {
+
+const typeDiagramBuilder = (direction: TypeDirection): DiagramBuilder => {
+    return async (editor, isIgnored, outputPath) => {
+        const entry = await resolveTypeEntry(editor)
+        if (!entry) return false
+
+        output.appendLine('entry type: ' + entry.name)
+        const getNode =
+            direction === 'Super' ? getSupertypeNode : getSubtypeNode
+        generateTypeDiagram(
+            await getNode(entry, isIgnored),
+            direction,
+            outputPath,
+        )
+        return true
+    }
+}
+
+const createIgnorePredicate = (workspace: vscode.Uri): IgnorePredicate => {
+    let ignoreFile: string | null =
+        vscode.workspace
+            .getConfiguration()
+            .get<string>('call-graph.ignoreFile')
+            ?.replace('${workspace}', workspace.fsPath) ?? null
+
+    if (ignoreFile && !fs.existsSync(ignoreFile)) ignoreFile = null
+
+    return item => {
+        if (ignoreFile === null) return false
+        // working in the current workspace
+        if (!item.uri.fsPath.startsWith(workspace.fsPath)) return true
+        const ig = ignore().add(fs.readFileSync(ignoreFile).toString())
+        const itemPath = item.uri.path.replace(`${workspace.path}/`, '')
+        return ig.test(itemPath).ignored
+    }
+}
+
+interface DiagramPanelOptions {
+    title: string
+    webviewType: string
+    template: Template
+    build: DiagramBuilder
+    outputFile: vscode.Uri
+    staticDir: string
+    onReceiveMsg: (msg: WebviewMsg) => void
+}
+
+const generateDiagram = (options: DiagramPanelOptions) => {
     return async () => {
         const activeTextEditor = vscode.window.activeTextEditor
         if (!activeTextEditor) {
@@ -63,83 +148,35 @@ const generateDiagram = (
             return
         }
 
-        const entry: vscode.CallHierarchyItem[] =
-            await vscode.commands.executeCommand(
-                'vscode.prepareCallHierarchy',
-                activeTextEditor.document.uri,
-                activeTextEditor.selection.active,
-            )
-        if (!entry || !entry[0]) {
-            vscode.window.showErrorMessage("Can't resolve entry function")
-            return
-        }
-
-        const workspace = vscode.workspace.workspaceFolders?.[0].uri
+        const workspace = vscode.workspace.workspaceFolders?.[0]?.uri
         if (!workspace) {
             vscode.window.showErrorMessage("Can't get workspace uri")
             return
         }
 
-        let ignoreFile: string | null =
-            vscode.workspace
-                .getConfiguration()
-                .get<string>('call-graph.ignoreFile')
-                ?.replace('${workspace}', workspace.fsPath) ?? null
+        const built = await options.build(
+            activeTextEditor,
+            createIgnorePredicate(workspace),
+            options.outputFile.fsPath,
+        )
+        if (!built) return
 
-        if (ignoreFile && !fs.existsSync(ignoreFile)) ignoreFile = null
-        const graph = await callNodeFunction(entry[0], item => {
-            if (ignoreFile === null) return false
-            // working in the current workspace
-            if (!item.uri.fsPath.startsWith(workspace.fsPath)) return true
-            const ig = ignore().add(fs.readFileSync(ignoreFile).toString())
-            const itemPath = item.uri.path.replace(`${workspace.path}/`, '')
-            const ignored = ig.test(itemPath).ignored
-            return ignored
-        })
-
-        if (diagramType === 'Graph') {
-            generateDot(graph, outputFile.fsPath)
-        } else if (diagramType === 'Sequence') {
-            generateMermaid(graph, outputFile.fsPath)
-        } else if (diagramType === 'Class') {
-            generateClassDiagram(graph, outputFile.fsPath)
-        }
-
-        const webviewType = `CallGraph.preview${diagramType}${type}`
         const panel = vscode.window.createWebviewPanel(
-            webviewType,
-            `${diagramType === 'Graph' ? 'Call Graph' : diagramType === 'Sequence' ? 'Sequence Diagram' : 'Class Diagram'} ${type}`,
+            options.webviewType,
+            options.title,
             vscode.ViewColumn.Beside,
             {
-                localResourceRoots: [vscode.Uri.file(staticDir)],
+                localResourceRoots: [vscode.Uri.file(options.staticDir)],
                 enableScripts: true,
             },
         )
-        const fileUri = panel.webview.asWebviewUri(outputFile).toString()
-
-        // Get vendor URIs
-        const vendorDir = path.join(staticDir, 'vendor')
-        const d3Uri = panel.webview
-            .asWebviewUri(vscode.Uri.file(path.join(vendorDir, 'd3.min.js')))
-            .toString()
-        const graphvizUri = panel.webview
-            .asWebviewUri(
-                vscode.Uri.file(path.join(vendorDir, 'graphviz.umd.js')),
-            )
-            .toString()
-        const d3GraphvizUri = panel.webview
-            .asWebviewUri(
-                vscode.Uri.file(path.join(vendorDir, 'd3-graphviz.js')),
-            )
-            .toString()
-
-        let html = getHtmlContent(staticDir, fileUri, diagramType)
-        html = html.replace('./vendor/d3.min.js', d3Uri)
-        html = html.replace('./vendor/graphviz.umd.js', graphvizUri)
-        html = html.replace('./vendor/d3-graphviz.js', d3GraphvizUri)
-
-        panel.webview.html = html
-        panel.webview.onDidReceiveMessage(onReceiveMsg)
+        panel.webview.html = renderHtml(
+            options.staticDir,
+            panel.webview,
+            panel.webview.asWebviewUri(options.outputFile).toString(),
+            options.template,
+        )
+        panel.webview.onDidReceiveMessage(options.onReceiveMsg)
     }
 }
 
@@ -154,9 +191,10 @@ interface WebviewMsg {
 const registerWebviewPanelSerializer = (
     staticDir: string,
     webViewType: string,
+    template: Template,
     onReceiveMsg: (msg: WebviewMsg) => void,
 ) => {
-    vscode.window.registerWebviewPanelSerializer(webViewType, {
+    return vscode.window.registerWebviewPanelSerializer(webViewType, {
         async deserializeWebviewPanel(
             webviewPanel: vscode.WebviewPanel,
             state: string,
@@ -168,287 +206,214 @@ const registerWebviewPanelSerializer = (
                 return
             }
 
-            // Get vendor URIs for deserialized panel
-            const vendorDir = path.join(staticDir, 'vendor')
-            const d3Uri = webviewPanel.webview
-                .asWebviewUri(
-                    vscode.Uri.file(path.join(vendorDir, 'd3.min.js')),
-                )
-                .toString()
-            const graphvizUri = webviewPanel.webview
-                .asWebviewUri(
-                    vscode.Uri.file(path.join(vendorDir, 'graphviz.umd.js')),
-                )
-                .toString()
-            const d3GraphvizUri = webviewPanel.webview
-                .asWebviewUri(
-                    vscode.Uri.file(path.join(vendorDir, 'd3-graphviz.js')),
-                )
-                .toString()
-
-            let html = getHtmlContent(staticDir, state)
-            html = html.replace('./vendor/d3.min.js', d3Uri)
-            html = html.replace('./vendor/graphviz.umd.js', graphvizUri)
-            html = html.replace('./vendor/d3-graphviz.js', d3GraphvizUri)
-
-            webviewPanel.webview.html = html
+            webviewPanel.webview.html = renderHtml(
+                staticDir,
+                webviewPanel.webview,
+                state,
+                template,
+            )
             webviewPanel.webview.onDidReceiveMessage(onReceiveMsg)
         },
     })
 }
 
+interface DiagramCommand {
+    command: string
+    progressTitle: string
+    title: string
+    webviewType: string
+    template: Template
+    /** name of the generated file inside the static directory */
+    dataFile: string
+    /** default file name offered when the user exports the diagram */
+    savedName: string
+    build: DiagramBuilder
+}
+
+const DIAGRAM_COMMANDS: DiagramCommand[] = [
+    {
+        command: 'CallGraph.showIncomingCallGraph',
+        progressTitle: 'Generate call graph',
+        title: 'Call Graph Incoming',
+        webviewType: 'CallGraph.previewGraphIncoming',
+        template: 'Graph',
+        dataFile: 'graph_data_incoming.dot',
+        savedName: 'call_graph_incoming',
+        build: callDiagramBuilder(getIncomingCallNode, generateDot),
+    },
+    {
+        command: 'CallGraph.showOutgoingCallGraph',
+        progressTitle: 'Generate call graph',
+        title: 'Call Graph Outgoing',
+        webviewType: 'CallGraph.previewGraphOutgoing',
+        template: 'Graph',
+        dataFile: 'graph_data_outgoing.dot',
+        savedName: 'call_graph_outgoing',
+        build: callDiagramBuilder(getOutgoingCallNode, generateDot),
+    },
+    {
+        command: 'CallGraph.showIncomingSequenceDiagram',
+        progressTitle: 'Generate sequence diagram',
+        title: 'Sequence Diagram Incoming',
+        webviewType: 'CallGraph.previewSequenceIncoming',
+        template: 'Sequence',
+        dataFile: 'sequence_data_incoming.mmd',
+        savedName: 'sequence_diagram_incoming',
+        build: callDiagramBuilder(getIncomingCallNode, generateMermaid),
+    },
+    {
+        command: 'CallGraph.showOutgoingSequenceDiagram',
+        progressTitle: 'Generate sequence diagram',
+        title: 'Sequence Diagram Outgoing',
+        webviewType: 'CallGraph.previewSequenceOutgoing',
+        template: 'Sequence',
+        dataFile: 'sequence_data_outgoing.mmd',
+        savedName: 'sequence_diagram_outgoing',
+        build: callDiagramBuilder(getOutgoingCallNode, generateMermaid),
+    },
+    {
+        command: 'CallGraph.showIncomingClassDiagram',
+        progressTitle: 'Generate class diagram',
+        title: 'Class Diagram Incoming',
+        webviewType: 'CallGraph.previewClassIncoming',
+        template: 'Class',
+        dataFile: 'class_data_incoming.mmd',
+        savedName: 'class_diagram_incoming',
+        build: callDiagramBuilder(getIncomingCallNode, generateClassDiagram),
+    },
+    {
+        command: 'CallGraph.showOutgoingClassDiagram',
+        progressTitle: 'Generate class diagram',
+        title: 'Class Diagram Outgoing',
+        webviewType: 'CallGraph.previewClassOutgoing',
+        template: 'Class',
+        dataFile: 'class_data_outgoing.mmd',
+        savedName: 'class_diagram_outgoing',
+        build: callDiagramBuilder(getOutgoingCallNode, generateClassDiagram),
+    },
+    {
+        command: 'CallGraph.showSupertypes',
+        progressTitle: 'Generate type hierarchy',
+        title: 'Type Hierarchy Supertypes',
+        webviewType: 'CallGraph.previewTypeSuper',
+        template: 'Class',
+        dataFile: 'type_data_super.mmd',
+        savedName: 'type_hierarchy_supertypes',
+        build: typeDiagramBuilder('Super'),
+    },
+    {
+        command: 'CallGraph.showSubtypes',
+        progressTitle: 'Generate type hierarchy',
+        title: 'Type Hierarchy Subtypes',
+        webviewType: 'CallGraph.previewTypeSub',
+        template: 'Class',
+        dataFile: 'type_data_sub.mmd',
+        savedName: 'type_hierarchy_subtypes',
+        build: typeDiagramBuilder('Sub'),
+    },
+]
+
+const onReceiveMsgFactory =
+    (workspace: vscode.Uri, savedName: string) => (msg: WebviewMsg) => {
+        if (msg.command === 'download') {
+            const onDowload = async (fileType: 'dot' | 'svg') => {
+                const f = await vscode.window.showSaveDialog({
+                    filters:
+                        fileType === 'svg'
+                            ? { Image: ['svg'] }
+                            : { Graphviz: ['dot', 'gv'] },
+                    defaultUri: vscode.Uri.joinPath(
+                        workspace,
+                        `${savedName}.${fileType}`,
+                    ),
+                })
+                if (!f) return
+                fs.writeFileSync(f.fsPath, msg.data)
+                vscode.window.showInformationMessage(
+                    'Call Graph file saved: ' + f.fsPath,
+                )
+            }
+            onDowload(msg.type)
+        } else if (msg.command === 'exportFile') {
+            // Handle the exportFile command from sequence.html
+            const handleExport = async () => {
+                try {
+                    // Determine file extension based on contentType or use the one in filename
+                    const filename = msg.filename || `${savedName}.txt`
+
+                    // Set up filters based on content type
+                    const filters: { [key: string]: string[] } = {}
+                    if (msg.contentType === 'image/svg+xml') {
+                        filters.Image = ['svg']
+                    } else if (msg.contentType === 'text/plain') {
+                        filters.Text = ['mmd', 'txt']
+                    } else {
+                        filters.All = ['*']
+                    }
+
+                    const f = await vscode.window.showSaveDialog({
+                        filters,
+                        defaultUri: vscode.Uri.joinPath(workspace, filename),
+                    })
+
+                    if (!f) return
+
+                    fs.writeFileSync(f.fsPath, msg.data)
+                    vscode.window.showInformationMessage(
+                        'File saved: ' + f.fsPath,
+                    )
+                } catch (error) {
+                    console.error('Error exporting file:', error)
+                    vscode.window.showErrorMessage(
+                        'Failed to export file: ' +
+                            (error instanceof Error
+                                ? error.message
+                                : String(error)),
+                    )
+                }
+            }
+
+            handleExport()
+        }
+    }
+
 export function activate(context: vscode.ExtensionContext) {
     const staticDir = path.resolve(context.extensionPath, 'static')
     if (!fs.existsSync(staticDir)) fs.mkdirSync(staticDir)
 
-    const workspace = vscode.workspace.workspaceFolders?.[0].uri
+    const workspace = vscode.workspace.workspaceFolders?.[0]?.uri
     if (!workspace) {
         vscode.window.showErrorMessage("Can't get workspace uri")
         return
     }
 
-    const dotFileOutgoing = vscode.Uri.file(
-        path.resolve(staticDir, 'graph_data_outgoing.dot'),
-    )
-    const dotFileIncoming = vscode.Uri.file(
-        path.resolve(staticDir, 'graph_data_incoming.dot'),
-    )
-    const mermaidFileOutgoing = vscode.Uri.file(
-        path.resolve(staticDir, 'sequence_data_outgoing.mmd'),
-    )
-    const mermaidFileIncoming = vscode.Uri.file(
-        path.resolve(staticDir, 'sequence_data_incoming.mmd'),
-    )
-    const classFileOutgoing = vscode.Uri.file(
-        path.resolve(staticDir, 'class_data_outgoing.mmd'),
-    )
-    const classFileIncoming = vscode.Uri.file(
-        path.resolve(staticDir, 'class_data_incoming.mmd'),
-    )
-    const onReceiveMsgFactory =
-        (
-            type: 'Incoming' | 'Outgoing',
-            diagramType: 'Graph' | 'Sequence' | 'Class' = 'Graph',
-        ) =>
-        (msg: WebviewMsg) => {
-            const savedName =
-                type === 'Incoming'
-                    ? diagramType === 'Graph'
-                        ? 'call_graph_incoming'
-                        : diagramType === 'Sequence'
-                          ? 'sequence_diagram_incoming'
-                          : 'class_diagram_incoming'
-                    : diagramType === 'Graph'
-                      ? 'call_graph_outgoing'
-                      : diagramType === 'Sequence'
-                        ? 'sequence_diagram_outgoing'
-                        : 'class_diagram_outgoing'
-            if (msg.command === 'download') {
-                const onDowload = async (fileType: 'dot' | 'svg') => {
-                    const f = await vscode.window.showSaveDialog({
-                        filters:
-                            fileType === 'svg'
-                                ? { Image: ['svg'] }
-                                : { Graphviz: ['dot', 'gv'] },
-                        defaultUri: vscode.Uri.joinPath(
-                            workspace,
-                            `${savedName}.${fileType}`,
-                        ),
-                    })
-                    if (!f) return
-                    fs.writeFileSync(f.fsPath, msg.data)
-                    vscode.window.showInformationMessage(
-                        'Call Graph file saved: ' + f.fsPath,
-                    )
-                }
-                onDowload(msg.type)
-            } else if (msg.command === 'exportFile') {
-                // Handle the exportFile command from sequence.html
-                const handleExport = async () => {
-                    try {
-                        // Determine file extension based on contentType or use the one in filename
-                        const filename = msg.filename || `${savedName}.txt`
+    for (const spec of DIAGRAM_COMMANDS) {
+        const outputFile = vscode.Uri.file(
+            path.resolve(staticDir, spec.dataFile),
+        )
+        const onReceiveMsg = onReceiveMsgFactory(workspace, spec.savedName)
 
-                        // Set up filters based on content type
-                        const filters: { [key: string]: string[] } = {}
-                        if (msg.contentType === 'image/svg+xml') {
-                            filters.Image = ['svg']
-                        } else if (msg.contentType === 'text/plain') {
-                            filters.Text = ['mmd', 'txt']
-                        } else {
-                            filters.All = ['*']
-                        }
-
-                        const f = await vscode.window.showSaveDialog({
-                            filters,
-                            defaultUri: vscode.Uri.joinPath(
-                                workspace,
-                                filename,
-                            ),
-                        })
-
-                        if (!f) return
-
-                        fs.writeFileSync(f.fsPath, msg.data)
-                        vscode.window.showInformationMessage(
-                            'File saved: ' + f.fsPath,
-                        )
-                    } catch (error) {
-                        console.error('Error exporting file:', error)
-                        vscode.window.showErrorMessage(
-                            'Failed to export file: ' +
-                                (error instanceof Error
-                                    ? error.message
-                                    : String(error)),
-                        )
-                    }
-                }
-
-                handleExport()
-            }
-        }
-    const incomingDisposable = vscode.commands.registerCommand(
-        'CallGraph.showIncomingCallGraph',
-        async () => {
-            vscode.window.withProgress(
-                getDefaultProgressOptions('Generate call graph'),
-                generateDiagram(
-                    'Incoming',
-                    getIncomingCallNode,
-                    dotFileIncoming,
-                    staticDir,
-                    onReceiveMsgFactory('Incoming', 'Graph'),
-                    'Graph',
-                ),
-            )
-        },
-    )
-    const outgoingDisposable = vscode.commands.registerCommand(
-        'CallGraph.showOutgoingCallGraph',
-        async () => {
-            vscode.window.withProgress(
-                getDefaultProgressOptions('Generate call graph'),
-                generateDiagram(
-                    'Outgoing',
-                    getOutgoingCallNode,
-                    dotFileOutgoing,
-                    staticDir,
-                    onReceiveMsgFactory('Outgoing', 'Graph'),
-                    'Graph',
-                ),
-            )
-        },
-    )
-
-    // New commands for sequence diagrams
-    const incomingSequenceDisposable = vscode.commands.registerCommand(
-        'CallGraph.showIncomingSequenceDiagram',
-        async () => {
-            vscode.window.withProgress(
-                getDefaultProgressOptions('Generate sequence diagram'),
-                generateDiagram(
-                    'Incoming',
-                    getIncomingCallNode,
-                    mermaidFileIncoming,
-                    staticDir,
-                    onReceiveMsgFactory('Incoming', 'Sequence'),
-                    'Sequence',
-                ),
-            )
-        },
-    )
-    const outgoingSequenceDisposable = vscode.commands.registerCommand(
-        'CallGraph.showOutgoingSequenceDiagram',
-        async () => {
-            vscode.window.withProgress(
-                getDefaultProgressOptions('Generate sequence diagram'),
-                generateDiagram(
-                    'Outgoing',
-                    getOutgoingCallNode,
-                    mermaidFileOutgoing,
-                    staticDir,
-                    onReceiveMsgFactory('Outgoing', 'Sequence'),
-                    'Sequence',
-                ),
-            )
-        },
-    )
-    // New commands for class diagrams
-    const incomingClassDisposable = vscode.commands.registerCommand(
-        'CallGraph.showIncomingClassDiagram',
-        async () => {
-            vscode.window.withProgress(
-                getDefaultProgressOptions('Generate class diagram'),
-                generateDiagram(
-                    'Incoming',
-                    getIncomingCallNode,
-                    classFileIncoming,
-                    staticDir,
-                    onReceiveMsgFactory('Incoming', 'Class'),
-                    'Class',
-                ),
-            )
-        },
-    )
-    const outgoingClassDisposable = vscode.commands.registerCommand(
-        'CallGraph.showOutgoingClassDiagram',
-        async () => {
-            vscode.window.withProgress(
-                getDefaultProgressOptions('Generate class diagram'),
-                generateDiagram(
-                    'Outgoing',
-                    getOutgoingCallNode,
-                    classFileOutgoing,
-                    staticDir,
-                    onReceiveMsgFactory('Outgoing', 'Class'),
-                    'Class',
-                ),
-            )
-        },
-    )
-    // Register serializers for call graph webviews
-    registerWebviewPanelSerializer(
-        staticDir,
-        `CallGraph.previewGraphIncoming`,
-        onReceiveMsgFactory('Incoming', 'Graph'),
-    )
-    registerWebviewPanelSerializer(
-        staticDir,
-        'CallGraph.previewGraphOutgoing',
-        onReceiveMsgFactory('Outgoing', 'Graph'),
-    )
-
-    // Register serializers for sequence diagram webviews
-    registerWebviewPanelSerializer(
-        staticDir,
-        `CallGraph.previewSequenceIncoming`,
-        onReceiveMsgFactory('Incoming', 'Sequence'),
-    )
-    registerWebviewPanelSerializer(
-        staticDir,
-        'CallGraph.previewSequenceOutgoing',
-        onReceiveMsgFactory('Outgoing', 'Sequence'),
-    )
-
-    // Register serializers for class diagram webviews
-    registerWebviewPanelSerializer(
-        staticDir,
-        `CallGraph.previewClassIncoming`,
-        onReceiveMsgFactory('Incoming', 'Class'),
-    )
-    registerWebviewPanelSerializer(
-        staticDir,
-        'CallGraph.previewClassOutgoing',
-        onReceiveMsgFactory('Outgoing', 'Class'),
-    )
-
-    // Add all disposables to context
-    context.subscriptions.push(
-        incomingDisposable,
-        outgoingDisposable,
-        incomingSequenceDisposable,
-        outgoingSequenceDisposable,
-        incomingClassDisposable,
-        outgoingClassDisposable,
-    )
+        context.subscriptions.push(
+            vscode.commands.registerCommand(spec.command, async () => {
+                vscode.window.withProgress(
+                    getDefaultProgressOptions(spec.progressTitle),
+                    generateDiagram({
+                        title: spec.title,
+                        webviewType: spec.webviewType,
+                        template: spec.template,
+                        build: spec.build,
+                        outputFile,
+                        staticDir,
+                        onReceiveMsg,
+                    }),
+                )
+            }),
+            registerWebviewPanelSerializer(
+                staticDir,
+                spec.webviewType,
+                spec.template,
+                onReceiveMsg,
+            ),
+        )
+    }
 }

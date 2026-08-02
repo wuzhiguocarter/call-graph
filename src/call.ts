@@ -35,7 +35,7 @@ async function getCallNode(
         const calls:
             | vscode.CallHierarchyOutgoingCall[]
             | vscode.CallHierarchyIncomingCall[] =
-            await vscode.commands.executeCommand(command, node.item)
+            (await vscode.commands.executeCommand(command, node.item)) ?? []
 
         await Promise.all(
             calls.map(call => {
@@ -90,7 +90,7 @@ async function getCallNode(
         const calls:
             | vscode.CallHierarchyOutgoingCall[]
             | vscode.CallHierarchyIncomingCall[] =
-            await vscode.commands.executeCommand(command, node.item)
+            (await vscode.commands.executeCommand(command, node.item)) ?? []
 
         if (outgoing) {
             calls.sort((a, b) => {

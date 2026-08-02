@@ -3,6 +3,7 @@
 .vscode-test/**
 src/**
 out/test
+out-test/**
 .gitignore
 .yarnrc
 vsc-extension-quickstart.md

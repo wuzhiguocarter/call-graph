@@ -9,6 +9,7 @@ vscode extension for generate call graph in [graphviz dot language](https://www.
 -   Generate call graph in graphviz dot language and preview
 -   Generate sequence diagrams using Mermaid syntax
 -   Generate class diagrams using Mermaid syntax
+-   Generate type hierarchy diagrams (supertypes and subtypes) using Mermaid syntax
 -   Save graph as dot or svg file
 -   Export sequence and class diagrams as SVG or download source code
 -   Intelligent filtering of high in-degree nodes to reduce diagram complexity
@@ -22,9 +23,10 @@ vscode extension for generate call graph in [graphviz dot language](https://www.
 3. Or Run `CallGraph.showIncomingCallGraph` command using context menu or `Ctrl+Shift+P` to show incoming calls
 4. For sequence diagrams, use `CallGraph.showOutgoingSequenceDiagram` or `CallGraph.showIncomingSequenceDiagram`
 5. For class diagrams, use `CallGraph.showOutgoingClassDiagram` or `CallGraph.showIncomingClassDiagram`
-6. Click `save dot file` or `save as svg` in the bottom left corner to save the graph
-7. For sequence and class diagrams, use the "Export SVG" or "Download Source Code" buttons
-8. Add `.callgraphignore` file in your project root directory to ignore some files or folders in workspace (the syntax is the same as `.gitignore`)
+6. For type hierarchies, put the cursor on a class or interface name and use `CallGraph.showSupertypes` or `CallGraph.showSubtypes`
+7. Click `save dot file` or `save as svg` in the bottom left corner to save the graph
+8. For sequence, class and type hierarchy diagrams, use the "Export SVG" or "Download Source Code" buttons
+9. Add `.callgraphignore` file in your project root directory to ignore some files or folders in workspace (the syntax is the same as `.gitignore`)
 
 ## Configuration
 
@@ -35,6 +37,12 @@ You can configure `ignoreFile`(.callgraphignore by default), `maxDepth`, and `in
 - `inDegreeThreshold`: Filter nodes with in-degree greater than this threshold in incoming call graphs (default: 5)
 
 ## Recent Updates
+
+### Type Hierarchy Diagrams
+- Added `CallGraph.showSupertypes` and `CallGraph.showSubtypes` for inheritance diagrams
+- Based on the type hierarchy language feature, so relations are resolved by the language server instead of inferred from call relations
+- Generalization (`extends`) is drawn as a solid arrow, realization (`implements`) as a dashed one
+- Respects the `maxDepth` and `ignoreFile` settings
 
 ### Class Diagrams
 - Added support for generating class diagrams using Mermaid syntax
@@ -59,6 +67,8 @@ You can configure `ignoreFile`(.callgraphignore by default), `maxDepth`, and `in
 ## How it works
 
 It depends `vscode.provideOutgoingCalls` and `vscode.provideIncomingCalls` built-in commands( the same with `Show Call Hierarchy` command, not available for some language server ).
+
+Type hierarchy diagrams depend on `vscode.provideSupertypes` and `vscode.provideSubtypes` ( the same with `Show Type Hierarchy` command, also not available for some language server ).
 
 ## Changelog
 
