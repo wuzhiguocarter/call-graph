@@ -1,5 +1,9 @@
 # Change Log
 
+## [1.6.2] 2026-08-03
+
+-   Renamed the display name to "Call Graph Viz", the Marketplace reserves display names globally as well and rejected "callviz"
+
 ## [1.6.1] 2026-08-03
 
 -   Renamed the extension id to `WuZhiguo.callgraph-viz`, the Marketplace reserves extension names globally and `callviz` is taken by another extension
