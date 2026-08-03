@@ -1,8 +1,8 @@
 {
     "name": "callgraph-viz",
-    "displayName": "callviz",
+    "displayName": "Call Graph Viz",
     "description": "Callgraph Visualization for vscode",
-    "version": "1.6.1",
+    "version": "1.6.2",
     "publisher": "WuZhiguo",
     "engines": {
         "vscode": "^1.65.0"
