@@ -4,7 +4,7 @@ import {
     getIncomingCallNode,
     getOutgoingCallNode,
 } from './call'
-import { generateDot } from './dot'
+import { generateFlowchart } from './flowchart'
 import { generateMermaid } from './mermaid'
 import { generateClassDiagram } from './class'
 import { getSubtypeNode, getSupertypeNode, TypeDirection } from './type'
@@ -56,25 +56,17 @@ const renderHtml = (
         .readFileSync(path.resolve(staticDir, TEMPLATE_FILES[template]))
         .toString()
 
-    const placeholder =
-        template === 'Graph' ? '$DOT_FILE_URI' : '$MERMAID_FILE_URI'
-    let html = htmlTemplate.split(placeholder).join(fileUri)
+    const html = htmlTemplate.split('$MERMAID_FILE_URI').join(fileUri)
 
-    // the graph template loads its renderer from the bundled vendor directory,
-    // which has to be rewritten to a webview uri to be reachable
-    const vendorDir = path.join(staticDir, 'vendor')
-    const vendorUri = (file: string) =>
-        webview
-            .asWebviewUri(vscode.Uri.file(path.join(vendorDir, file)))
-            .toString()
-    html = html.replace('./vendor/d3.min.js', vendorUri('d3.min.js'))
-    html = html.replace(
-        './vendor/graphviz.umd.js',
-        vendorUri('graphviz.umd.js'),
+    // assets referenced relative to the static directory, such as the bundled
+    // mermaid library, have to be rewritten to webview uris to be reachable
+    const staticUri = webview
+        .asWebviewUri(vscode.Uri.file(staticDir))
+        .toString()
+    return html.replace(
+        /(src|href)="\.\/([^"]+)"/g,
+        (_, attr, file) => `${attr}="${staticUri}/${file}"`,
     )
-    html = html.replace('./vendor/d3-graphviz.js', vendorUri('d3-graphviz.js'))
-
-    return html
 }
 
 const callDiagramBuilder = (
@@ -182,7 +174,6 @@ const generateDiagram = (options: DiagramPanelOptions) => {
 
 interface WebviewMsg {
     command: string
-    type: 'dot' | 'svg'
     data: string
     filename?: string
     contentType?: string
@@ -237,9 +228,9 @@ const DIAGRAM_COMMANDS: DiagramCommand[] = [
         title: 'Call Graph Incoming',
         webviewType: 'CallGraph.previewGraphIncoming',
         template: 'Graph',
-        dataFile: 'graph_data_incoming.dot',
+        dataFile: 'graph_data_incoming.mmd',
         savedName: 'call_graph_incoming',
-        build: callDiagramBuilder(getIncomingCallNode, generateDot),
+        build: callDiagramBuilder(getIncomingCallNode, generateFlowchart),
     },
     {
         command: 'CallGraph.showOutgoingCallGraph',
@@ -247,9 +238,9 @@ const DIAGRAM_COMMANDS: DiagramCommand[] = [
         title: 'Call Graph Outgoing',
         webviewType: 'CallGraph.previewGraphOutgoing',
         template: 'Graph',
-        dataFile: 'graph_data_outgoing.dot',
+        dataFile: 'graph_data_outgoing.mmd',
         savedName: 'call_graph_outgoing',
-        build: callDiagramBuilder(getOutgoingCallNode, generateDot),
+        build: callDiagramBuilder(getOutgoingCallNode, generateFlowchart),
     },
     {
         command: 'CallGraph.showIncomingSequenceDiagram',
@@ -313,33 +304,22 @@ const DIAGRAM_COMMANDS: DiagramCommand[] = [
     },
 ]
 
+/** default extension of an exported file, by the content type it was sent with */
+const EXPORT_EXTENSIONS: Record<string, string> = {
+    'image/svg+xml': 'svg',
+    'text/plain': 'mmd',
+}
+
 const onReceiveMsgFactory =
     (workspace: vscode.Uri, savedName: string) => (msg: WebviewMsg) => {
-        if (msg.command === 'download') {
-            const onDowload = async (fileType: 'dot' | 'svg') => {
-                const f = await vscode.window.showSaveDialog({
-                    filters:
-                        fileType === 'svg'
-                            ? { Image: ['svg'] }
-                            : { Graphviz: ['dot', 'gv'] },
-                    defaultUri: vscode.Uri.joinPath(
-                        workspace,
-                        `${savedName}.${fileType}`,
-                    ),
-                })
-                if (!f) return
-                fs.writeFileSync(f.fsPath, msg.data)
-                vscode.window.showInformationMessage(
-                    'Call Graph file saved: ' + f.fsPath,
-                )
-            }
-            onDowload(msg.type)
-        } else if (msg.command === 'exportFile') {
-            // Handle the exportFile command from sequence.html
+        if (msg.command === 'exportFile') {
+            // Handle the exportFile command from the diagram templates
             const handleExport = async () => {
                 try {
                     // Determine file extension based on contentType or use the one in filename
-                    const filename = msg.filename || `${savedName}.txt`
+                    const extension =
+                        EXPORT_EXTENSIONS[msg.contentType ?? ''] ?? 'txt'
+                    const filename = msg.filename || `${savedName}.${extension}`
 
                     // Set up filters based on content type
                     const filters: { [key: string]: string[] } = {}

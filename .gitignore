@@ -4,4 +4,4 @@ dist
 node_modules
 .vscode-test/
 *.vsix
-/static/*.dot
+/static/*_data_*.mmd

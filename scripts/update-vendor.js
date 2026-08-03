@@ -16,34 +16,11 @@ const files = [
             __dirname,
             '..',
             'node_modules',
-            '@hpcc-js',
-            'wasm',
+            'mermaid',
             'dist',
-            'graphviz.umd.js',
+            'mermaid.min.js',
         ),
-        dest: path.join(vendorDir, 'graphviz.umd.js'),
-    },
-    {
-        source: path.join(
-            __dirname,
-            '..',
-            'node_modules',
-            'd3',
-            'dist',
-            'd3.min.js',
-        ),
-        dest: path.join(vendorDir, 'd3.min.js'),
-    },
-    {
-        source: path.join(
-            __dirname,
-            '..',
-            'node_modules',
-            'd3-graphviz',
-            'build',
-            'd3-graphviz.js',
-        ),
-        dest: path.join(vendorDir, 'd3-graphviz.js'),
+        dest: path.join(vendorDir, 'mermaid.min.js'),
     },
 ]
 
