@@ -4,6 +4,11 @@ import * as crypto from 'crypto'
 import * as path from 'path'
 import * as vscode from 'vscode'
 import { output } from './extension'
+import {
+    getSourceLocation,
+    SourceLocation,
+    writeNavigation,
+} from './navigation'
 
 /**
  * Generate a Mermaid sequence diagram from a call hierarchy node
@@ -16,6 +21,8 @@ export function generateMermaid(graph: CallHierarchyNode, path: string) {
 
     // 存储参与者路径和对应的显示名称
     const participants = new Map<string, string>()
+    // 存储参与者所在文件的源码位置，用于点击跳转
+    const participantLocations = new Map<string, SourceLocation>()
     // 存储调用关系用于拓扑排序
     const callGraph = new Map<string, Set<string>>()
     // 调用路径集合用于去重
@@ -28,7 +35,7 @@ export function generateMermaid(graph: CallHierarchyNode, path: string) {
     const visited = new Set<string>()
 
     // Store calls in order of discovery to preserve sequence
-    const orderedCalls: Array<[string, string, string]> = []
+    const orderedCalls: OrderedCall[] = []
 
     // Get the in-degree threshold from settings
     const inDegreeThreshold =
@@ -45,6 +52,7 @@ export function generateMermaid(graph: CallHierarchyNode, path: string) {
         graph,
         callGraph,
         participants,
+        participantLocations,
         workspaceRoot,
         visited,
         orderedCalls,
@@ -58,7 +66,10 @@ export function generateMermaid(graph: CallHierarchyNode, path: string) {
 
     // Use the ordered calls instead of topological sort
     // 生成Mermaid调用序列
-    orderedCalls.forEach(([callerPath, calleePath, callLabel]) => {
+    // the messages are collected in the same order, so that the webview can
+    // pair them with the arrows mermaid draws
+    const messages: SourceLocation[] = []
+    orderedCalls.forEach(([callerPath, calleePath, callLabel, location]) => {
         const signature = `${callerPath}->${calleePath}:${callLabel}`
         if (!callSignatures.has(signature)) {
             mermaid.addSimpleCall(
@@ -67,15 +78,30 @@ export function generateMermaid(graph: CallHierarchyNode, path: string) {
                 callLabel,
             )
             callSignatures.add(signature)
+            messages.push(location)
         }
     })
 
     // Save the generated diagram to a file
     fs.writeFileSync(path, mermaid.toString())
     output.appendLine('Generated Mermaid sequence diagram: ' + path)
+    writeNavigation(path, {
+        participants: [...participants.keys()].map(
+            filePath => participantLocations.get(filePath)!,
+        ),
+        messages,
+    })
 
     return mermaid
 }
+
+/** a call in the order it was discovered, with the position of the callee */
+type OrderedCall = [
+    callerPath: string,
+    calleePath: string,
+    callLabel: string,
+    location: SourceLocation,
+]
 
 /**
  * Traverse the call hierarchy to build a sequence of function calls
@@ -87,9 +113,10 @@ function traverseForCallGraph(
     node: CallHierarchyNode,
     callGraph: Map<string, Set<string>>,
     participants: Map<string, string>,
+    participantLocations: Map<string, SourceLocation>,
     workspaceRoot: string,
     visited: Set<string> = new Set(),
-    orderedCalls: Array<[string, string, string]> = [],
+    orderedCalls: OrderedCall[] = [],
     inDegreeThreshold: number = 5,
 ) {
     // 获取文件相对路径作为参与者标识
@@ -105,6 +132,8 @@ function traverseForCallGraph(
             '#' +
             crypto.randomBytes(2).toString('hex')
         participants.set(callerPath, callerShortName)
+        // 参与者跳转到该文件中最先出现的符号
+        participantLocations.set(callerPath, getSourceLocation(node.item))
     }
 
     // Sort children by source position before processing
@@ -164,6 +193,7 @@ function traverseForCallGraph(
                 '#' +
                 crypto.randomBytes(2).toString('hex')
             participants.set(calleePath, calleeShortName)
+            participantLocations.set(calleePath, getSourceLocation(child.item))
         }
 
         // 添加调用关系到图
@@ -176,7 +206,12 @@ function traverseForCallGraph(
         callGraph.get(callerPath)!.add(edge)
 
         // Add to ordered calls to preserve sequence
-        orderedCalls.push([callerPath, calleePath, callLabel])
+        orderedCalls.push([
+            callerPath,
+            calleePath,
+            callLabel,
+            getSourceLocation(child.item),
+        ])
 
         // 递归处理子节点
         if (!visited.has(child.item.uri.fsPath)) {
@@ -185,6 +220,7 @@ function traverseForCallGraph(
                 child,
                 callGraph,
                 participants,
+                participantLocations,
                 workspaceRoot,
                 visited,
                 orderedCalls,

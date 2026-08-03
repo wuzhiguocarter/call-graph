@@ -2,6 +2,11 @@ import * as fs from 'fs'
 import * as vscode from 'vscode'
 import { TypeDirection, TypeHierarchyNode } from './type'
 import { output } from './extension'
+import {
+    getSourceLocation,
+    SourceLocation,
+    writeNavigation,
+} from './navigation'
 
 /**
  * Generate a Mermaid class diagram describing an inheritance hierarchy
@@ -39,6 +44,7 @@ export function generateTypeDiagram(
 
     fs.writeFileSync(path, diagram.toString())
     output.appendLine('Generated Mermaid type diagram: ' + path)
+    writeNavigation(path, { nodes: diagram.getLocations() })
 
     return diagram
 }
@@ -71,6 +77,15 @@ class MermaidTypeDiagram {
     private _declared = new Set<string>()
     private _types: string[] = []
     private _relations = new Set<string>()
+    private _locations: Record<string, SourceLocation> = {}
+
+    /**
+     * The source position of every type, by its mermaid id, so that the
+     * webview can reveal the declaration a node was drawn for
+     */
+    getLocations(): Record<string, SourceLocation> {
+        return this._locations
+    }
 
     /**
      * Map an item to a stable identifier, since type names may contain
@@ -94,6 +109,7 @@ class MermaidTypeDiagram {
         const id = this.getSafeId(item)
         if (this._declared.has(id)) return
         this._declared.add(id)
+        this._locations[id] = getSourceLocation(item)
 
         const label = escapeLabel(item.name)
         const stereotype = STEREOTYPES[item.kind]

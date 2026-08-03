@@ -1,5 +1,16 @@
 # Change Log
 
+## [1.6.0] 2026-08-03
+
+-   Added click to source: every diagram element jumps to the code it was drawn for
+    -   Call graph: a node opens its function
+    -   Class diagram: a class box opens the symbol it was inferred from, a method row opens that method
+    -   Type hierarchy: a node opens the declaration of the type
+    -   Sequence diagram: a participant or its lifeline opens its file, a message opens the function that is called
+    -   The position is written to a `<diagram>.map.json` next to the diagram, so a restored panel stays navigable
+    -   Panning the diagram no longer counts as a click, so dragging never jumps away
+-   The sequence and class diagram views now use the bundled Mermaid library instead of loading 11.4.1 from a CDN, so every view renders offline and with the same version
+
 ## [1.5.0] 2026-08-03
 
 -   Render incoming and outgoing call graphs with Mermaid instead of Graphviz

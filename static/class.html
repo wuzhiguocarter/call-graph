@@ -3,7 +3,8 @@
     <head>
         <meta charset="UTF-8" />
         <title>类图查看器</title>
-        <script src="https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.min.js"></script>
+        <script src="./vendor/mermaid.min.js"></script>
+        <script src="./navigation.js"></script>
         <style>
             :root {
                 --bg-color: #ffffff;
@@ -30,6 +31,11 @@
                 border-radius: 4px;
                 cursor: pointer;
                 transition: opacity 0.3s;
+            }
+            .hint {
+                align-self: center;
+                font-size: 12px;
+                opacity: 0.7;
             }
             button:hover {
                 opacity: 0.8;
@@ -59,6 +65,7 @@
             <button onclick="resetView()">最佳视野</button>
             <button onclick="exportSVG()">导出SVG</button>
             <button onclick="downloadMMD()">下载源码</button>
+            <span class="hint">点击类或方法跳转到定义</span>
         </div>
         <div id="chart-container"></div>
 
@@ -124,6 +131,13 @@
                             initPanZoom(svgElement)
                             // Set initial view
                             resetView()
+                            // Classes jump to their declaration, methods to
+                            // the function they were drawn for
+                            loadDiagramNavigation(
+                                svgElement,
+                                '$MERMAID_MAP_URI',
+                                revealSource,
+                            )
                         }
                     })
                     .catch(error => {
@@ -329,6 +343,10 @@
                         )
                         showError(error)
                     })
+            }
+
+            function revealSource(location) {
+                vscode.postMessage({ command: 'reveal', location })
             }
 
             function showError(error) {
