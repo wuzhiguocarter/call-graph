@@ -1,5 +1,11 @@
 # Change Log
 
+## [1.6.1] 2026-08-03
+
+-   Renamed the extension id to `WuZhiguo.callgraph-viz`, the Marketplace reserves extension names globally and `callviz` is taken by another extension
+    -   The display name stays "callviz", only the id and the Marketplace url change
+    -   No published version carried the old id, so nothing has to be migrated
+
 ## [1.6.0] 2026-08-03
 
 -   Added click to source: every diagram element jumps to the code it was drawn for
