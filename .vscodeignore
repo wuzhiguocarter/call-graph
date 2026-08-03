@@ -12,7 +12,7 @@ vsc-extension-quickstart.md
 **/*.map
 **/*.ts
 .history
-static/*.dot
+static/*_data_*.mmd
 pnpm-lock.yaml
 eslint.config.mjs
 esbuild.mjs

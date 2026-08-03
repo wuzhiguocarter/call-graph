@@ -2,7 +2,7 @@
     "name": "callviz",
     "displayName": "callviz",
     "description": "Callgraph Visualization for vscode",
-    "version": "1.4.0",
+    "version": "1.5.0",
     "publisher": "WuZhiguo",
     "engines": {
         "vscode": "^1.65.0"
@@ -161,15 +161,13 @@
     },
     "homepage": "https://github.com/wuzhiguocarter/call-graph/blob/master/README.md",
     "keywords": [
-        "graphviz",
+        "mermaid",
         "call graph",
-        "dot"
+        "flowchart"
     ],
     "dependencies": {
-        "@hpcc-js/wasm": "^2.28.0",
-        "d3": "^7.9.0",
-        "d3-graphviz": "^5.6.0",
-        "ignore": "^6.0.2"
+        "ignore": "^6.0.2",
+        "mermaid": "^11.16.0"
     },
     "simple-git-hooks": {
         "pre-commit": "pnpm lint-staged"

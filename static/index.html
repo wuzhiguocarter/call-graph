@@ -1,94 +1,364 @@
 <!doctype html>
-<html lang="en">
+<html lang="zh-CN">
     <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>Call Graph</title>
-        <script src="./vendor/d3.min.js"></script>
-        <script src="./vendor/graphviz.umd.js"></script>
-        <script src="./vendor/d3-graphviz.js"></script>
+        <title>调用图查看器</title>
+        <script src="./vendor/mermaid.min.js"></script>
+        <style>
+            :root {
+                --bg-color: #ffffff;
+                --text-color: #333333;
+            }
+            body {
+                margin: 0;
+                padding: 20px;
+                background-color: var(--bg-color);
+                color: var(--text-color);
+                overflow: hidden;
+            }
+            .toolbar {
+                margin-bottom: 20px;
+                display: flex;
+                gap: 10px;
+                flex-wrap: wrap;
+            }
+            button {
+                padding: 8px 15px;
+                background: #409eff;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                cursor: pointer;
+                transition: opacity 0.3s;
+            }
+            button:hover {
+                opacity: 0.8;
+            }
+            #chart-container {
+                border: 1px solid #eee;
+                padding: 20px;
+                border-radius: 4px;
+                overflow: auto;
+                height: 80vh;
+                display: flex;
+            }
+            .error {
+                color: #f56c6c;
+                padding: 10px;
+                border: 1px solid currentColor;
+                border-radius: 4px;
+                margin-top: 10px;
+            }
+        </style>
     </head>
-
     <body>
-        <div id="app"></div>
-        <div class="btn-container">
-            <button class="btn" id="downloadDot">save dot file</button>
-            <button class="btn" id="downloadSvg">save as svg</button>
+        <div class="toolbar">
+            <button onclick="zoomIn()">放大</button>
+            <button onclick="zoomOut()">缩小</button>
+            <button onclick="resetView()">最佳视野</button>
+            <button onclick="exportSVG()">导出SVG</button>
+            <button onclick="downloadMMD()">下载源码</button>
         </div>
-    </body>
-    <script>
-        function updateSvgViewBox() {
-            const width = window.innerWidth
-            const height = window.innerHeight
+        <div id="chart-container"></div>
 
-            d3.select('#app>svg')
-                .attr('width', width)
-                .attr('height', height)
-                .attr('viewBox', [0, 0, width, height].join(' '))
-        }
-
-        ;(async function () {
+        <script>
             const vscode = acquireVsCodeApi()
-            // Inject dot file uri: $DOT_FILE_URI
-            vscode.setState('$DOT_FILE_URI')
-            const dot = await (await fetch('$DOT_FILE_URI')).text()
-            const gv = d3
-                .select('#app')
-                .graphviz()
-                .renderDot(dot, () => {
-                    d3.select(window).on('resize.updatesvg', updateSvgViewBox)
-                    updateSvgViewBox()
-                })
-            d3.select('#downloadSvg').on('click', () => {
-                gv.resetZoom()
-                const svgElement = d3.select('#app>svg')
-                const box = svgElement.node().getBBox()
-                svgElement
-                    .attr('width', box.width)
-                    .attr('height', box.height)
-                    .attr('viewBox', [0, 0, box.width, box.height].join(' '))
+            // Inject mermaid file uri: $MERMAID_FILE_URI
+            vscode.setState('$MERMAID_FILE_URI')
 
-                const serializer = new XMLSerializer()
-                const svg = serializer.serializeToString(svgElement.node())
-
-                updateSvgViewBox()
-                vscode.postMessage({
-                    command: 'download',
-                    type: 'svg',
-                    data: svg,
+            function initMermaid() {
+                const style = getComputedStyle(document.body)
+                mermaid.initialize({
+                    startOnLoad: false,
+                    theme: 'base',
+                    // a call graph easily exceeds the default node limit
+                    maxTextSize: 5000000,
+                    maxEdges: 5000,
+                    flowchart: {
+                        useMaxWidth: false,
+                        htmlLabels: true,
+                        curve: 'basis',
+                    },
+                    themeVariables: {
+                        background: style.getPropertyValue('--bg-color').trim(),
+                        primaryColor: '#ffffff',
+                        primaryBorderColor: '#409eff',
+                        primaryTextColor: style
+                            .getPropertyValue('--text-color')
+                            .trim(),
+                        textColor: style
+                            .getPropertyValue('--text-color')
+                            .trim(),
+                        // keep every box white, like the other diagram views
+                        mainBkg: '#ffffff',
+                        nodeBkg: '#ffffff',
+                        nodeBorder: '#409eff',
+                        nodeTextColor: style
+                            .getPropertyValue('--text-color')
+                            .trim(),
+                        // the file subgraphs
+                        clusterBkg: '#fafafa',
+                        clusterBorder: '#dddddd',
+                        titleColor: style
+                            .getPropertyValue('--text-color')
+                            .trim(),
+                        edgeLabelBackground: '#ffffff',
+                        lineColor: '#333333',
+                    },
                 })
+            }
+
+            function renderMermaid() {
+                const container = document.getElementById('chart-container')
+                container.innerHTML = '<div class="loading">加载中...</div>'
+
+                fetch(vscode.getState())
+                    .then(response => response.text())
+                    .then(text => mermaid.render('mermaid-svg', text))
+                    .then(({ svg }) => {
+                        container.innerHTML = svg
+                        const svgElement = container.querySelector('svg')
+                        if (svgElement) {
+                            // Store original SVG for export
+                            window.originalSVG = svg
+                            // Initialize pan/zoom
+                            initPanZoom(svgElement)
+                            // Set initial view
+                            resetView()
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error rendering Mermaid diagram:', error)
+                        showError(error)
+                    })
+            }
+
+            let scale = 1
+            let isPanning = false
+            let startPoint = { x: 0, y: 0 }
+            let viewBox = { x: 0, y: 0, w: 0, h: 0 }
+            let svgElement = null
+
+            function initPanZoom(svg) {
+                svgElement = svg
+                svg.addEventListener('wheel', handleMouseWheel)
+                svg.addEventListener('mousedown', startDragging)
+                svg.addEventListener('mousemove', whileDragging)
+                svg.addEventListener('mouseup', endDragging)
+                svg.addEventListener('mouseleave', endDragging)
+            }
+
+            function handleMouseWheel(e) {
+                e.preventDefault()
+                if (!svgElement) return
+
+                const direction = e.deltaY < 0 ? 1 : -1
+                const factor = 0.1
+                const zoom = 1 + factor * direction
+
+                // Get mouse position relative to SVG
+                const svgRect = svgElement.getBoundingClientRect()
+                const mouseX = e.clientX - svgRect.left
+                const mouseY = e.clientY - svgRect.top
+
+                // Calculate new scale
+                const oldScale = scale
+                scale = Math.max(0.1, Math.min(10, scale * zoom))
+
+                // Adjust viewBox to zoom around mouse position
+                const mouseXInSVG = viewBox.x + mouseX / oldScale
+                const mouseYInSVG = viewBox.y + mouseY / oldScale
+
+                viewBox.x = mouseXInSVG - mouseX / scale
+                viewBox.y = mouseYInSVG - mouseY / scale
+                viewBox.w = svgElement.clientWidth / scale
+                viewBox.h = svgElement.clientHeight / scale
+
+                updateSVGViewBox()
+            }
+
+            function startDragging(e) {
+                if (e.button !== 0) return // Only left button
+                isPanning = true
+                startPoint = { x: e.clientX, y: e.clientY }
+            }
+
+            function whileDragging(e) {
+                if (!isPanning || !svgElement) return
+
+                const dx = (e.clientX - startPoint.x) / scale
+                const dy = (e.clientY - startPoint.y) / scale
+
+                viewBox.x -= dx
+                viewBox.y -= dy
+
+                updateSVGViewBox()
+                startPoint = { x: e.clientX, y: e.clientY }
+            }
+
+            function endDragging() {
+                isPanning = false
+            }
+
+            function updateSVGViewBox() {
+                if (!svgElement) return
+                const viewBoxStr = `${viewBox.x} ${viewBox.y} ${viewBox.w} ${viewBox.h}`
+                svgElement.setAttribute('viewBox', viewBoxStr)
+            }
+
+            function zoomIn() {
+                if (!svgElement) return
+                scale = Math.min(10, scale * 1.2)
+                viewBox.w = svgElement.clientWidth / scale
+                viewBox.h = svgElement.clientHeight / scale
+                updateSVGViewBox()
+            }
+
+            function zoomOut() {
+                if (!svgElement) return
+                scale = Math.max(0.1, scale / 1.2)
+                viewBox.w = svgElement.clientWidth / scale
+                viewBox.h = svgElement.clientHeight / scale
+                updateSVGViewBox()
+            }
+
+            function resetView() {
+                if (!svgElement) return
+
+                // Get the dimensions of the rendered graph
+                let bbox
+                try {
+                    const graph = svgElement.querySelector('g')
+                    bbox = (graph ?? svgElement).getBBox()
+                } catch (e) {
+                    console.error('Error getting bounding box:', e)
+                    // Fallback dimensions
+                    bbox = { x: 0, y: 0, width: 800, height: 600 }
+                }
+
+                // Add padding
+                const padding = 20
+                bbox = {
+                    x: bbox.x - padding,
+                    y: bbox.y - padding,
+                    width: bbox.width + padding * 2,
+                    height: bbox.height + padding * 2,
+                }
+
+                // Calculate scale to fit the content
+                const containerWidth = svgElement.clientWidth
+                const containerHeight = svgElement.clientHeight
+                const scaleX = containerWidth / bbox.width
+                const scaleY = containerHeight / bbox.height
+                scale = Math.min(scaleX, scaleY, 1) // Limit to 1x for readability
+
+                // Update viewBox
+                viewBox = {
+                    x: bbox.x,
+                    y: bbox.y,
+                    w: containerWidth / scale,
+                    h: containerHeight / scale,
+                }
+
+                updateSVGViewBox()
+            }
+
+            function exportSVG() {
+                if (!window.originalSVG) {
+                    showError('No SVG to export')
+                    return
+                }
+
+                try {
+                    // Export the diagram at its natural size, independent of
+                    // the zoom the user is currently looking at
+                    const parser = new DOMParser()
+                    const svgDoc = parser.parseFromString(
+                        window.originalSVG,
+                        'image/svg+xml',
+                    )
+                    const exported = svgDoc.documentElement
+
+                    const bbox = svgElement
+                        ? (
+                              svgElement.querySelector('g') ?? svgElement
+                          ).getBBox()
+                        : { x: 0, y: 0, width: 800, height: 600 }
+
+                    exported.setAttribute(
+                        'viewBox',
+                        `${bbox.x} ${bbox.y} ${bbox.width} ${bbox.height}`,
+                    )
+                    exported.setAttribute('width', `${bbox.width}`)
+                    exported.setAttribute('height', `${bbox.height}`)
+
+                    const serializer = new XMLSerializer()
+                    vscode.postMessage({
+                        command: 'exportFile',
+                        data: serializer.serializeToString(exported),
+                        contentType: 'image/svg+xml',
+                    })
+                } catch (error) {
+                    console.error('Error exporting SVG:', error)
+                    showError(error)
+                }
+            }
+
+            function downloadMMD() {
+                fetch(vscode.getState())
+                    .then(response => response.text())
+                    .then(text => {
+                        vscode.postMessage({
+                            command: 'exportFile',
+                            data: text,
+                            contentType: 'text/plain',
+                        })
+                    })
+                    .catch(error => {
+                        console.error(
+                            'Error downloading Mermaid source:',
+                            error,
+                        )
+                        showError(error)
+                    })
+            }
+
+            function showError(error) {
+                const container = document.getElementById('chart-container')
+                const errorDiv = document.createElement('div')
+                errorDiv.className = 'error'
+                errorDiv.textContent = `Error: ${error.message || error}`
+                container.appendChild(errorDiv)
+            }
+
+            // Handle window resize to adjust SVG dimensions
+            function handleWindowResize() {
+                if (!svgElement) return
+
+                // Update viewBox dimensions based on new container size
+                viewBox.w = svgElement.clientWidth / scale
+                viewBox.h = svgElement.clientHeight / scale
+                updateSVGViewBox()
+
+                // If the diagram is very small, reset the view
+                if (scale < 0.2) {
+                    resetView()
+                }
+            }
+
+            // Add window resize event listener
+            window.addEventListener('resize', handleWindowResize)
+
+            initMermaid()
+            renderMermaid()
+
+            // Handle VSCode theme changes
+            window.addEventListener('message', event => {
+                if (event.data.type === 'theme-changed') {
+                    document.location.reload()
+                }
             })
-            d3.select('#downloadDot').on('click', () => {
-                vscode.postMessage({
-                    command: 'download',
-                    type: 'dot',
-                    data: dot,
-                })
-            })
-        })()
-    </script>
-    <style>
-        .btn-container {
-            position: fixed;
-            bottom: 8px;
-        }
-
-        .btn {
-            display: inline-block;
-            font-weight: 400;
-            color: #212529;
-            text-align: center;
-            border: 1px solid transparent;
-            padding: 0.3rem 0.6rem;
-            font-size: 1rem;
-            line-height: 1.5;
-            border-radius: 0.25rem;
-            color: #fff;
-            background-color: #007bff;
-        }
-
-        .btn:hover {
-            background-color: #0069d9;
-        }
-    </style>
+        </script>
+    </body>
 </html>

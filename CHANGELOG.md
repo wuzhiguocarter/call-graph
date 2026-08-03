@@ -1,69 +1,77 @@
 # Change Log
 
+## [1.5.0] 2026-08-03
+
+-   Render incoming and outgoing call graphs with Mermaid instead of Graphviz
+    -   Call graphs are generated as a Mermaid `flowchart LR`, with one subgraph per file and one edge per call
+    -   The call graph view got the same toolbar as the other diagram views: zoom, best fit, SVG export and Mermaid source download
+    -   `save dot file` is gone, the diagram source is now downloaded as a `.mmd` file
+    -   Dropped the D3, d3-graphviz and Graphviz WASM dependencies, the bundled Mermaid library replaces them and keeps the view working without network access
+
 ## [1.4.0] 2026-08-02
 
-- Added type hierarchy diagrams
-    - New commands: "Show supertype hierarchy" and "Show subtype hierarchy"
-    - Built on the `vscode.provideSupertypes` / `vscode.provideSubtypes` language feature, so inheritance is reported by the language server instead of being inferred from call relations
-    - Generalization (`extends`) is drawn as a solid arrow, realization (`implements`) as a dashed one; interfaces, enums and structs are marked with a stereotype
-    - Honours the existing `maxDepth` and `ignoreFile` settings
-- Fixed "Can't resolve entry function" being raised whenever the cursor was not exactly on a symbol name
-    - The entry symbol is now retried once for a language server that is still starting up, then resolved from the enclosing function or type
-    - The error message explains what to do, and the unresolved position is written to the CallGraph output channel
-- Fixed restored webview panels always rendering with the call graph template, which broke sequence and class diagrams after a window reload
-- Fixed the webview panel serializers never being disposed
-- Added a unit test suite covering type hierarchy traversal, diagram generation and entry resolution, and wired it into CI
-- Updated the CI and release workflows to Node 22, since Node 20 reached end of life in April 2026
+-   Added type hierarchy diagrams
+    -   New commands: "Show supertype hierarchy" and "Show subtype hierarchy"
+    -   Built on the `vscode.provideSupertypes` / `vscode.provideSubtypes` language feature, so inheritance is reported by the language server instead of being inferred from call relations
+    -   Generalization (`extends`) is drawn as a solid arrow, realization (`implements`) as a dashed one; interfaces, enums and structs are marked with a stereotype
+    -   Honours the existing `maxDepth` and `ignoreFile` settings
+-   Fixed "Can't resolve entry function" being raised whenever the cursor was not exactly on a symbol name
+    -   The entry symbol is now retried once for a language server that is still starting up, then resolved from the enclosing function or type
+    -   The error message explains what to do, and the unresolved position is written to the CallGraph output channel
+-   Fixed restored webview panels always rendering with the call graph template, which broke sequence and class diagrams after a window reload
+-   Fixed the webview panel serializers never being disposed
+-   Added a unit test suite covering type hierarchy traversal, diagram generation and entry resolution, and wired it into CI
+-   Updated the CI and release workflows to Node 22, since Node 20 reached end of life in April 2026
 
 ## [1.3.2] 2025-10-31
 
-- Bundled the D3 and Graphviz libraries locally so call graphs render without network access
+-   Bundled the D3 and Graphviz libraries locally so call graphs render without network access
 
 ## [1.3.1] 2025-03-21
 
-- Updated the Mermaid library to 11.4.1
+-   Updated the Mermaid library to 11.4.1
 
 ## [1.3.0] 2025-03-12
 
-- Added class diagram generation and visualization feature
-  - New commands: "Show outgoing class diagram" and "Show incoming class diagram"
-  - Generate class diagrams based on function call relationships
-  - Interactive diagram viewing with SVG and Mermaid file export options
-  - Consistent UI with sequence diagram feature
+-   Added class diagram generation and visualization feature
+    -   New commands: "Show outgoing class diagram" and "Show incoming class diagram"
+    -   Generate class diagrams based on function call relationships
+    -   Interactive diagram viewing with SVG and Mermaid file export options
+    -   Consistent UI with sequence diagram feature
 
 ## [1.2.9] 2025-03-11
 
-- Improved sequence diagram accuracy with source position-based ordering
-  - Enhanced call hierarchy nodes to track source code positions
-  - Implemented sorting of function calls based on their position in source code
-  - Fixed issue where sequence diagrams didn't reflect actual call order
-- Updated README with recent feature changes and improvements
+-   Improved sequence diagram accuracy with source position-based ordering
+    -   Enhanced call hierarchy nodes to track source code positions
+    -   Implemented sorting of function calls based on their position in source code
+    -   Fixed issue where sequence diagrams didn't reflect actual call order
+-   Updated README with recent feature changes and improvements
 
 ## [1.2.8] 2025-03-08
 
-- Fixed participant name formatting in Mermaid sequence diagrams
-  - Removed extra quotation marks in participant names
-- Improved file export functionality for sequence diagrams
-  - Added proper handling for SVG export and source code download
-  - Updated to use VSCode's save dialog for file operations
+-   Fixed participant name formatting in Mermaid sequence diagrams
+    -   Removed extra quotation marks in participant names
+-   Improved file export functionality for sequence diagrams
+    -   Added proper handling for SVG export and source code download
+    -   Updated to use VSCode's save dialog for file operations
 
 ## [1.2.6] 2025-03-06
 
-- Added Mermaid sequence diagram generation feature
-  - Generate sequence diagrams based on function call order from AST traversal
-  - New commands: "Show outgoing sequence diagram" and "Show incoming sequence diagram"
-  - Interactive diagram viewing with SVG and Mermaid file export options
-- Updated repository URLs
-- Renamed extension to "callviz" for marketplace uniqueness
+-   Added Mermaid sequence diagram generation feature
+    -   Generate sequence diagrams based on function call order from AST traversal
+    -   New commands: "Show outgoing sequence diagram" and "Show incoming sequence diagram"
+    -   Interactive diagram viewing with SVG and Mermaid file export options
+-   Updated repository URLs
+-   Renamed extension to "callviz" for marketplace uniqueness
 
 ## [1.2.5] 2025-03-06
 
-- Same features as v1.2.4 with version bump for deployment
+-   Same features as v1.2.4 with version bump for deployment
 
 ## [1.2.4] 2025-03-05
 
-- add `call-graph.inDegreeThreshold` setting to filter nodes with in-degree greater than the threshold in incoming call graphs.
-- fix issue with duplicate edges appearing between the same nodes in the graph visualization.
+-   add `call-graph.inDegreeThreshold` setting to filter nodes with in-degree greater than the threshold in incoming call graphs.
+-   fix issue with duplicate edges appearing between the same nodes in the graph visualization.
 
 ## [1.2.3] 2024-12-19
 
