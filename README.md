@@ -11,6 +11,7 @@ vscode extension for generate call graph in [mermaid](https://mermaid.js.org/) s
 -   Generate class diagrams using Mermaid syntax
 -   Generate type hierarchy diagrams (supertypes and subtypes) using Mermaid syntax
 -   Export every diagram as SVG or download its Mermaid source code
+-   Click any element of a diagram to jump to the code it was drawn for
 -   Intelligent filtering of high in-degree nodes to reduce diagram complexity
 -   Accurate representation of actual call sequence in sequence diagrams
 -   Language-agnostic class detection for class diagrams (supports C++, Go, TypeScript, and more)
@@ -23,8 +24,9 @@ vscode extension for generate call graph in [mermaid](https://mermaid.js.org/) s
 4. For sequence diagrams, use `CallGraph.showOutgoingSequenceDiagram` or `CallGraph.showIncomingSequenceDiagram`
 5. For class diagrams, use `CallGraph.showOutgoingClassDiagram` or `CallGraph.showIncomingClassDiagram`
 6. For type hierarchies, put the cursor on a class or interface name and use `CallGraph.showSupertypes` or `CallGraph.showSubtypes`
-7. Use the "Export SVG" or "Download Source Code" buttons in the toolbar to save any diagram
-8. Add `.callgraphignore` file in your project root directory to ignore some files or folders in workspace (the syntax is the same as `.gitignore`)
+7. Click a node, a class, a method, a participant or a message to open it in the editor
+8. Use the "Export SVG" or "Download Source Code" buttons in the toolbar to save any diagram
+9. Add `.callgraphignore` file in your project root directory to ignore some files or folders in workspace (the syntax is the same as `.gitignore`)
 
 ## Configuration
 
@@ -35,6 +37,11 @@ You can configure `ignoreFile`(.callgraphignore by default), `maxDepth`, and `in
 -   `inDegreeThreshold`: Filter nodes with in-degree greater than this threshold in incoming call graphs (default: 5)
 
 ## Recent Updates
+
+### Click to Source
+
+-   Every diagram element opens the code it was drawn for: call graph nodes, class boxes and their method rows, type declarations, sequence participants and messages
+-   The extension writes the positions next to the generated diagram, so panels stay navigable after a window reload
 
 ### Mermaid Call Graphs
 

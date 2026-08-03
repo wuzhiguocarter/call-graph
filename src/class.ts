@@ -3,6 +3,19 @@ import * as fs from 'fs'
 import * as path from 'path'
 import * as vscode from 'vscode'
 import { output } from './extension'
+import {
+    getSourceLocation,
+    SourceLocation,
+    writeNavigation,
+} from './navigation'
+
+/** where the class of a diagram node and its methods are declared */
+interface ClassLocations {
+    /** the first symbol the class was discovered through */
+    class: SourceLocation
+    /** by method name, before it is rendered as `+name()` */
+    methods: Map<string, SourceLocation>
+}
 
 /**
  * Generate a Mermaid class diagram from a call hierarchy node
@@ -19,6 +32,8 @@ export function generateClassDiagram(graph: CallHierarchyNode, path: string) {
     const relationships = new Set<string>()
     // 存储被调用的方法
     const calledMethods = new Map<string, Set<string>>()
+    // 存储类和方法的源码位置，用于点击跳转
+    const locations = new Map<string, ClassLocations>()
     // 获取工作区根路径
     const workspaceRoot =
         vscode.workspace.workspaceFolders?.[0].uri.fsPath || ''
@@ -42,6 +57,7 @@ export function generateClassDiagram(graph: CallHierarchyNode, path: string) {
         classes,
         relationships,
         calledMethods,
+        locations,
         workspaceRoot,
         visited,
         inDegreeThreshold,
@@ -71,8 +87,38 @@ export function generateClassDiagram(graph: CallHierarchyNode, path: string) {
     // Save the generated diagram to a file
     fs.writeFileSync(path, mermaid.toString())
     output.appendLine('Generated Mermaid class diagram: ' + path)
+    writeNavigation(path, collectNavigation(classes, locations))
 
     return mermaid
+}
+
+/**
+ * Map the classes of the diagram to the source they were built from. Only the
+ * methods that survived filtering are rendered, so only those are navigable.
+ */
+function collectNavigation(
+    classes: Map<string, ClassInfo>,
+    locations: Map<string, ClassLocations>,
+) {
+    const nodes: Record<string, SourceLocation> = {}
+    const members: Record<string, Record<string, SourceLocation>> = {}
+
+    classes.forEach((classInfo, className) => {
+        const known = locations.get(className)
+        if (!known) return
+        nodes[className] = known.class
+
+        classInfo.methods.forEach(method => {
+            const location = known.methods.get(method)
+            // the label the member is rendered with, see `addClass`
+            if (location) {
+                members[className] = members[className] ?? {}
+                members[className][`+${method}()`] = location
+            }
+        })
+    })
+
+    return { nodes, members }
 }
 
 /**
@@ -93,10 +139,29 @@ function buildClassDiagram(
     classes: Map<string, ClassInfo>,
     relationships: Set<string>,
     calledMethods: Map<string, Set<string>>,
+    locations: Map<string, ClassLocations>,
     workspaceRoot: string,
     visited: Set<string> = new Set(),
     inDegreeThreshold: number = 5,
 ) {
+    /** remember where a class and one of its methods are declared */
+    const rememberLocation = (
+        name: string,
+        method: string | null,
+        item: vscode.CallHierarchyItem,
+    ) => {
+        const location = getSourceLocation(item)
+        // the first symbol a class is discovered through wins, it is the one
+        // closest to the entry of the graph
+        const known = locations.get(name) ?? {
+            class: location,
+            methods: new Map<string, SourceLocation>(),
+        }
+        locations.set(name, known)
+        if (method && !known.methods.has(method)) {
+            known.methods.set(method, location)
+        }
+    }
     // Skip if already visited to prevent cycles
     if (visited.has(node.item.uri.fsPath + node.item.name)) {
         return
@@ -134,6 +199,8 @@ function buildClassDiagram(
         classes.get(className)!.methods.push(methodName)
     }
 
+    rememberLocation(className, methodName, node.item)
+
     // Process child nodes
     node.children.forEach(child => {
         // Apply in-degree filtering - skip nodes with high in-degree
@@ -157,6 +224,12 @@ function buildClassDiagram(
         const { className: childClassName, methodName: childMethodName } =
             extractClassAndMethod(child.item.name, childRelativePath)
 
+        // a child skipped by the visited check or by filtering is still drawn
+        // as a member of its class, so its position is recorded here as well
+        if (childClassName) {
+            rememberLocation(childClassName, childMethodName, child.item)
+        }
+
         // Add relationship between classes if both exist
         if (className && childClassName && className !== childClassName) {
             // Add a dependency relationship
@@ -177,6 +250,7 @@ function buildClassDiagram(
             classes,
             relationships,
             calledMethods,
+            locations,
             workspaceRoot,
             visited,
             inDegreeThreshold,

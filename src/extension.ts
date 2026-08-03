@@ -10,6 +10,7 @@ import { generateClassDiagram } from './class'
 import { getSubtypeNode, getSupertypeNode, TypeDirection } from './type'
 import { generateTypeDiagram } from './typeDiagram'
 import { resolveCallEntry, resolveTypeEntry } from './entry'
+import { getNavigationPath } from './navigation'
 import * as path from 'path'
 import * as fs from 'fs'
 import ignore from 'ignore'
@@ -56,7 +57,17 @@ const renderHtml = (
         .readFileSync(path.resolve(staticDir, TEMPLATE_FILES[template]))
         .toString()
 
-    const html = htmlTemplate.split('$MERMAID_FILE_URI').join(fileUri)
+    // the navigation data sits next to the diagram, so a restored panel only
+    // has to remember the uri of the diagram itself
+    const [diagramUri, query] = fileUri.split('?')
+    const mapUri =
+        getNavigationPath(diagramUri) + (query === undefined ? '' : `?${query}`)
+
+    const html = htmlTemplate
+        .split('$MERMAID_FILE_URI')
+        .join(fileUri)
+        .split('$MERMAID_MAP_URI')
+        .join(mapUri)
 
     // assets referenced relative to the static directory, such as the bundled
     // mermaid library, have to be rewritten to webview uris to be reachable
@@ -177,6 +188,39 @@ interface WebviewMsg {
     data: string
     filename?: string
     contentType?: string
+    /** the source position a clicked diagram element points at */
+    location?: { uri: string; line: number; character: number }
+}
+
+/**
+ * Open the file a diagram element was drawn for and put the cursor on it
+ * @param location The position sent by the webview
+ */
+const revealSource = async (location: {
+    uri: string
+    line: number
+    character: number
+}) => {
+    try {
+        const document = await vscode.workspace.openTextDocument(
+            vscode.Uri.parse(location.uri),
+        )
+        const position = new vscode.Position(location.line, location.character)
+        await vscode.window.showTextDocument(document, {
+            // the diagram is opened beside the editor, so the source goes back
+            // to the column the entry symbol was picked in
+            viewColumn: vscode.ViewColumn.One,
+            selection: new vscode.Range(position, position),
+        })
+    } catch (error) {
+        output.appendLine(
+            `failed to reveal ${location.uri}: ` +
+                (error instanceof Error ? error.message : String(error)),
+        )
+        vscode.window.showErrorMessage(
+            "CallGraph: can't open the source of this element",
+        )
+    }
 }
 
 const registerWebviewPanelSerializer = (
@@ -312,7 +356,9 @@ const EXPORT_EXTENSIONS: Record<string, string> = {
 
 const onReceiveMsgFactory =
     (workspace: vscode.Uri, savedName: string) => (msg: WebviewMsg) => {
-        if (msg.command === 'exportFile') {
+        if (msg.command === 'reveal') {
+            if (msg.location) revealSource(msg.location)
+        } else if (msg.command === 'exportFile') {
             // Handle the exportFile command from the diagram templates
             const handleExport = async () => {
                 try {

@@ -3,6 +3,11 @@ import * as fs from 'fs'
 import * as path from 'path'
 import * as vscode from 'vscode'
 import { output } from './extension'
+import {
+    getSourceLocation,
+    SourceLocation,
+    writeNavigation,
+} from './navigation'
 
 /**
  * Generate a Mermaid flowchart from a call hierarchy node
@@ -35,6 +40,7 @@ export function generateFlowchart(
 
     fs.writeFileSync(outputPath, diagram.toString())
     output.appendLine('Generated Mermaid flowchart: ' + outputPath)
+    writeNavigation(outputPath, { nodes: diagram.getLocations() })
 
     return diagram
 }
@@ -65,8 +71,17 @@ class MermaidFlowchart {
     private _ids = new Map<string, string>()
     private _files = new Map<string, { id: string; nodes: string[] }>()
     private _edges = new Set<string>()
+    private _locations: Record<string, SourceLocation> = {}
 
     constructor(private _workspaceRoot: string) {}
+
+    /**
+     * The source position of every node, by its mermaid id, so that the
+     * webview can reveal the function a node was drawn for
+     */
+    getLocations(): Record<string, SourceLocation> {
+        return this._locations
+    }
 
     /**
      * Declare a symbol as a node inside the subgraph of its file, ignoring
@@ -81,6 +96,7 @@ class MermaidFlowchart {
 
         const id = `node_${this._ids.size}`
         this._ids.set(key, id)
+        this._locations[id] = getSourceLocation(item)
         this.getFile(item.uri).nodes.push(
             `        ${id}["${escapeLabel(item.name)}"]`,
         )
